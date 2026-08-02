@@ -1,9 +1,10 @@
 ---
 id: TASK-002.02
 title: Port src/variables.h to variables.zig (g_ram accessor bank)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-02 04:19'
+updated_date: '2026-08-02 08:40'
 labels: []
 dependencies:
   - TASK-002.01
@@ -19,17 +20,17 @@ Create variables.zig mirroring src/variables.h's ~1,037 macros of the form `#def
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 variables.zig provides an accessor for every macro in src/variables.h, matching name and exact byte offset
-- [ ] #2 Struct-overlay macros use extern struct with align(1) fields; overlapping-offset pairs (e.g. room_bounds_y/ow_scroll_vars0) are both represented and documented as intentional aliases
-- [ ] #3 A generation script exists (kept in the repo, e.g. under other/ or assets/) so the mapping can be regenerated/diffed against variables.h
-- [ ] #4 Spot-checking 20+ random accessors against variables.h shows byte-identical offsets and types
+- [x] #1 variables.zig provides an accessor for every macro in src/variables.h, matching name and exact byte offset
+- [x] #2 Struct-overlay macros use extern struct with align(1) fields; overlapping-offset pairs (e.g. room_bounds_y/ow_scroll_vars0) are both represented and documented as intentional aliases
+- [x] #3 A generation script exists (kept in the repo, e.g. under other/ or assets/) so the mapping can be regenerated/diffed against variables.h
+- [x] #4 Spot-checking 20+ random accessors against variables.h shows byte-identical offsets and types
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 task zig:build compiles clean
-- [ ] #2 Running the binary with zelda3.sfc loaded shows zero 'Memory compare failed' lines on stderr (RAM-compare oracle)
-- [ ] #3 Replay of reference saves (saves/ref/Chapter*.sav) stays clean
-- [ ] #4 The file's C-ABI symbols are unchanged so remaining .c files link without edits
-- [ ] #5 zelda3.bak and the C taskfile.yml build remain untouched and working
+- [x] #1 task zig:build compiles clean
+- [x] #2 Running the binary with zelda3.sfc loaded shows zero 'Memory compare failed' lines on stderr (RAM-compare oracle)
+- [x] #3 Replay of reference saves (saves/ref/Chapter*.sav) stays clean
+- [x] #4 The file's C-ABI symbols are unchanged so remaining .c files link without edits
+- [x] #5 zelda3.bak and the C taskfile.yml build remain untouched and working
 <!-- DOD:END -->
