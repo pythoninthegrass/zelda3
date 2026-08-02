@@ -1,10 +1,10 @@
 ---
 id: TASK-002.03
 title: Port src/util.c to util.zig (first cross-language proof)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-02 04:19'
-updated_date: '2026-08-02 16:14'
+updated_date: '2026-08-02 16:54'
 labels: []
 dependencies:
   - TASK-002.02
@@ -20,19 +20,19 @@ Port src/util.c — a true leaf module with minimal includes — to util.zig as 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 util.c is removed from the C build and util.zig is compiled instead
-- [ ] #2 All exported symbols use callconv(.c) and match the original C names exactly
-- [ ] #3 Every remaining .c file that included util.h and called its functions compiles and links with zero changes
-- [ ] #4 Full Phase 0-style verification passes (build clean, zero RAM-compare mismatches, reference-save replay clean)
+- [x] #1 util.c is removed from the C build and util.zig is compiled instead
+- [x] #2 All exported symbols use callconv(.c) and match the original C names exactly
+- [x] #3 Every remaining .c file that included util.h and called its functions compiles and links with zero changes
+- [x] #4 Full Phase 0-style verification passes (build clean, zero RAM-compare mismatches, reference-save replay clean)
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 task zig:build compiles clean
-- [ ] #2 Running the binary with zelda3.sfc loaded shows zero 'Memory compare failed' lines on stderr (RAM-compare oracle)
-- [ ] #3 Replay of reference saves (saves/ref/Chapter*.sav) stays clean
-- [ ] #4 The file's C-ABI symbols are unchanged so remaining .c files link without edits
-- [ ] #5 zelda3.bak and the C taskfile.yml build remain untouched and working
+- [x] #1 task zig:build compiles clean
+- [x] #2 Running the binary with zelda3.sfc loaded shows zero 'Memory compare failed' lines on stderr (RAM-compare oracle)
+- [x] #3 Replay of reference saves (saves/ref/Chapter*.sav) stays clean
+- [x] #4 The file's C-ABI symbols are unchanged so remaining .c files link without edits
+- [x] #5 zelda3.bak and the C taskfile.yml build remain untouched and working
 <!-- DOD:END -->
 
 ## Comments
