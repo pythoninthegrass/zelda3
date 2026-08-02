@@ -7,6 +7,9 @@ shopt: ['globstar']
 
 dotenv: ['.env']
 
+includes:
+  zig: taskfiles/zig.yml
+
 env:
   VENV_DIR: "{{.ROOT_DIR}}/.venv"
   PATH: "{{.VENV_DIR}}/bin:{{.PATH}}"
