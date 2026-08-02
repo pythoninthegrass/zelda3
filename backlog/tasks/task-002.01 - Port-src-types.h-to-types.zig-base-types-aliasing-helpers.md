@@ -1,10 +1,10 @@
 ---
 id: TASK-002.01
 title: Port src/types.h to types.zig (base types + aliasing helpers)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-02 04:19'
-updated_date: '2026-08-02 07:58'
+updated_date: '2026-08-02 08:01'
 labels: []
 dependencies:
   - TASK-001.04
@@ -20,18 +20,18 @@ Port src/types.h's base integer typedefs and the type-punning helper macros BYTE
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 types.zig defines the base integer typedefs matching src/types.h
-- [ ] #2 BYTE/WORD/DWORD/HIBYTE/load24 equivalents exist as Zig inline fns using *align(1) pointers, handling unaligned offsets correctly
-- [ ] #3 No existing .c file needs to change to use these (or the change is limited to swapping the #include for the ported symbols)
+- [x] #1 types.zig defines the base integer typedefs matching src/types.h
+- [x] #2 BYTE/WORD/DWORD/HIBYTE/load24 equivalents exist as Zig inline fns using *align(1) pointers, handling unaligned offsets correctly
+- [x] #3 No existing .c file needs to change to use these (or the change is limited to swapping the #include for the ported symbols)
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 task zig:build compiles clean
-- [ ] #2 Running the binary with zelda3.sfc loaded shows zero 'Memory compare failed' lines on stderr (RAM-compare oracle)
-- [ ] #3 Replay of reference saves (saves/ref/Chapter*.sav) stays clean
-- [ ] #4 The file's C-ABI symbols are unchanged so remaining .c files link without edits
-- [ ] #5 zelda3.bak and the C taskfile.yml build remain untouched and working
+- [x] #1 task zig:build compiles clean
+- [x] #2 Running the binary with zelda3.sfc loaded shows zero 'Memory compare failed' lines on stderr (RAM-compare oracle)
+- [x] #3 Replay of reference saves (saves/ref/Chapter*.sav) stays clean
+- [x] #4 The file's C-ABI symbols are unchanged so remaining .c files link without edits
+- [x] #5 zelda3.bak and the C taskfile.yml build remain untouched and working
 <!-- DOD:END -->
 
 ## Implementation Notes
