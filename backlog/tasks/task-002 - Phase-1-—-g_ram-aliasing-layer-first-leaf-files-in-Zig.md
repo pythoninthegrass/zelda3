@@ -1,9 +1,10 @@
 ---
 id: TASK-002
 title: Phase 1 — g_ram aliasing layer + first leaf files in Zig
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-02 04:18'
+updated_date: '2026-08-02 21:21'
 labels: []
 milestone: m-0
 dependencies: []
