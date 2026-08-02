@@ -1,9 +1,10 @@
 ---
 id: TASK-001
 title: Phase 0 — Build infrastructure for the Zig port
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-02 04:18'
+updated_date: '2026-08-02 05:13'
 labels: []
 milestone: m-0
 dependencies: []
@@ -21,9 +22,15 @@ Full plan context: /Users/lance/.claude/plans/i-m-interested-in-porting-polished
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 task zig:build compiles clean
-- [ ] #2 Running the binary with zelda3.sfc loaded shows zero 'Memory compare failed' lines on stderr (RAM-compare oracle)
-- [ ] #3 Replay of reference saves (saves/ref/Chapter*.sav) stays clean
-- [ ] #4 The file's C-ABI symbols are unchanged so remaining .c files link without edits
-- [ ] #5 zelda3.bak and the C taskfile.yml build remain untouched and working
+- [x] #1 task zig:build compiles clean
+- [x] #2 Running the binary with zelda3.sfc loaded shows zero 'Memory compare failed' lines on stderr (RAM-compare oracle)
+- [x] #3 Replay of reference saves (saves/ref/Chapter*.sav) stays clean
+- [x] #4 The file's C-ABI symbols are unchanged so remaining .c files link without edits
+- [x] #5 zelda3.bak and the C taskfile.yml build remain untouched and working
 <!-- DOD:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Phase 0 complete: all four subtasks (backup + gitignore, build.zig compiling the unmodified C codebase, taskfiles/zig.yml wired into taskfile.yml, and end-to-end parity verification) are done. The Zig toolchain, build, task runner integration, and RAM-compare verification workflow are all proven with zero game code yet ported to Zig, and the C reference build (zelda3.bak / task build) remains untouched throughout. Ready to begin Phase 1 (TASK-002).
+<!-- SECTION:FINAL_SUMMARY:END -->
