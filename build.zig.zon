@@ -1,0 +1,6 @@
+.{
+    .name = .zelda3,
+    .version = "0.0.0",
+    .fingerprint = 0xb7b1678e8c5629d9,
+    .paths = .{""},
+}
