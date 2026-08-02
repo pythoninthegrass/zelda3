@@ -1,4 +1,5 @@
 # Zelda3
+
 A reimplementation of Zelda 3.
 
 Our discord server is: https://discord.gg/AJJbJAzNNJ
@@ -81,8 +82,14 @@ Asset extraction scripts declare their own dependencies (Pillow, PyYAML) via inl
 4. Install SDL2
 * Ubuntu/Debian `sudo apt install libsdl2-dev`
 * Fedora Linux `sudo dnf install SDL2-devel`
+* RHEL-family (AlmaLinux/Rocky/CentOS) `sudo dnf install epel-release SDL2-devel` — on EL10 there's
+  no `SDL2-devel` package yet, so `task install` (see below) builds SDL2 from source into `/usr/local`
+  instead
 * Arch Linux `sudo pacman -S sdl2`
 * macOS: `brew install sdl2` (you can get homebrew [here](https://brew.sh/))
+
+Alternatively, `task install` (see below) detects your OS/distro and runs the equivalent step
+automatically.
 
 ## Compiling on Linux/MacOS
 1. Install [Task](https://taskfile.dev/installation/) (a `Taskfile.dev` task runner used instead of `make`)
@@ -97,6 +104,7 @@ Advanced task usage ...
 </summary>
 
 ```sh
+task install            # install SDL2 for the current OS
 task build          # compile only, skip asset extraction
 task clean build    # clear gen+obj and rebuild
 task clean:obj build    # clear obj only and rebuild
