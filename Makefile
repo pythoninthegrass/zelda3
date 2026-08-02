@@ -2,7 +2,7 @@ TARGET_EXEC:=zelda3
 ROM:=tables/zelda3.sfc
 SRCS:=$(wildcard src/*.c snes/*.c) third_party/gl_core/gl_core_3_1.c third_party/opus-1.3.1-stripped/opus_decoder_amalgam.c
 OBJS:=$(SRCS:%.c=%.o)
-PYTHON:=/usr/bin/env python3
+UV:=uv run
 CFLAGS:=$(if $(CFLAGS),$(CFLAGS),-O2 -Werror) -I .
 CFLAGS:=${CFLAGS} $(shell sdl2-config --cflags) -DSYSTEM_VOLUME_MIXER_AVAILABLE=0
 
@@ -28,7 +28,7 @@ $(RES): src/platform/win32/zelda3.rc
 
 zelda3_assets.dat:
 	@echo "Extracting game resources"
-	$(PYTHON) assets/restool.py --extract-from-rom
+	$(UV) assets/restool.py --extract-from-rom
 
 clean: clean_obj clean_gen
 clean_obj:
