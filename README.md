@@ -99,7 +99,9 @@ Advanced task usage ...
 ```sh
 task build          # compile only, skip asset extraction
 task clean build    # clear gen+obj and rebuild
-CC=clang task       # specify compiler
+task clean:obj build    # clear obj only and rebuild
+task clean:gen          # clear generated assets only
+CC=clang task           # specify compiler
 ```
 </details>
 
