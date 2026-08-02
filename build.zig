@@ -10,7 +10,13 @@ pub fn build(b: *std.Build) void {
     // Debug; `zig build -Doptimize=Debug` still overrides for local debugging.
     const optimize = b.option(std.builtin.OptimizeMode, "optimize", "Prioritize performance, safety, or binary size") orelse .ReleaseFast;
 
+    // The exe module's root_source_file is the first ported Zig module that
+    // exports C-ABI symbols consumed by the remaining C translation units
+    // (util.zig replaces util.c; StrFmt stays in C in util_strfmt.c). Zig
+    // compiles it into the same object set as the C sources below, so the
+    // C callers link unchanged.
     const exe_mod = b.createModule(.{
+        .root_source_file = b.path("src/util.zig"),
         .target = target,
         .optimize = optimize,
         .link_libc = true,
@@ -20,6 +26,9 @@ pub fn build(b: *std.Build) void {
         .name = "zelda3",
         .root_module = exe_mod,
     });
+    // The C main() in src/main.c is the program entry point; the Zig root
+    // module only exports C-ABI symbols consumed by the C side.
+    exe.entry = .disabled;
 
     exe_mod.addIncludePath(b.path("."));
 
@@ -40,7 +49,7 @@ pub fn build(b: *std.Build) void {
     run_step.dependOn(&run_cmd.step);
 
     addTestStep(b, "test", "Run Tier-A unit tests for ported Zig modules", &unit_test_files, target, optimize);
-    addTestStep(b, "difftest", "Run Tier-B differential tests for ported Zig modules", &diff_test_files, target, optimize);
+    addDiffTestStep(b, target, optimize);
 }
 
 // Tier-A unit tests for ported Zig modules (zig build test). Empty until a
@@ -55,7 +64,9 @@ const unit_test_files = [_][]const u8{
 // pre-port C object (symbols renamed via objcopy) and its ported .zig
 // module, run over randomized inputs. Empty until a module is ported;
 // each port task wires its own differential harness here.
-const diff_test_files = [_][]const u8{};
+const diff_test_files = [_][]const u8{
+    "src/util_difftest.zig",
+};
 
 fn addTestStep(b: *std.Build, name: []const u8, desc: []const u8, files: []const []const u8, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
     const step = b.step(name, desc);
@@ -64,6 +75,7 @@ fn addTestStep(b: *std.Build, name: []const u8, desc: []const u8, files: []const
             .root_source_file = b.path(file),
             .target = target,
             .optimize = optimize,
+            .link_libc = true,
         });
         const mod_test = b.addTest(.{
             .root_module = test_mod,
@@ -71,6 +83,64 @@ fn addTestStep(b: *std.Build, name: []const u8, desc: []const u8, files: []const
         const run_test = b.addRunArtifact(mod_test);
         step.dependOn(&run_test.step);
     }
+}
+
+// Tier-B differential tests link a pre-port C object (symbols renamed with a
+// c_ prefix via objcopy) against the ported .zig module, so the test can call
+// both and diff their outputs over randomized inputs. Each ported module that
+// has a pre-port C reference wires its own (test file, C source, rename list)
+// entry here.
+fn addDiffTestStep(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
+    const step = b.step("difftest", "Run Tier-B differential tests for ported Zig modules");
+
+    const util_ref = compileRenamedCRef(b, target, optimize, "src/util.c", &.{
+        "NextDelim",           "StringEqualsNoCase",       "StringStartsWithNoCase",
+        "ReadWholeFile",       "NextLineStripComments",    "NextPossiblyQuotedString",
+        "ReplaceFilenameWithNewPath", "SplitKeyValue",     "SkipPrefix",
+        "StrSet",              "ByteArray_Resize",         "ByteArray_Destroy",
+        "ByteArray_AppendData", "ByteArray_AppendByte",    "FindIndexInMemblk",
+        "ApplyBps",
+    });
+
+    for (&diff_test_files) |file| {
+        const test_mod = b.createModule(.{
+            .root_source_file = b.path(file),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        });
+        const mod_test = b.addTest(.{
+            .root_module = test_mod,
+        });
+        mod_test.root_module.addObjectFile(util_ref);
+        const run_test = b.addRunArtifact(mod_test);
+        step.dependOn(&run_test.step);
+    }
+}
+
+// Compile a pre-port C source to an object, then rename each exported symbol
+// to c_<name> via objcopy so it links alongside the ported Zig module (which
+// owns the original names) without colliding. Returns the renamed object as a
+// LazyPath for mod_test.addObjectFile.
+fn compileRenamedCRef(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, src: []const u8, syms: []const []const u8) std.Build.LazyPath {
+    const ref_mod = b.createModule(.{
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
+    ref_mod.addIncludePath(b.path("."));
+    ref_mod.addCSourceFile(.{ .file = b.path(src) });
+    const ref_obj = b.addObject(.{
+        .name = "util_c_ref",
+        .root_module = ref_mod,
+    });
+
+    const objcopy = b.addSystemCommand(&.{"objcopy"});
+    for (syms) |sym| {
+        objcopy.addArgs(&.{ "--redefine-sym", b.fmt("{s}=c_{s}", .{ sym, sym }) });
+    }
+    objcopy.addFileArg(ref_obj.getEmittedBin());
+    return objcopy.addOutputFileArg("util_c_ref_renamed.o");
 }
 
 // Same source list as taskfile.yml's SOURCES var: src/*.c + snes/*.c at
@@ -116,7 +186,7 @@ const sources = [_][]const u8{
     "src/sprite.c",
     "src/tagalong.c",
     "src/tile_detect.c",
-    "src/util.c",
+    "src/util_strfmt.c",
     "src/zelda_cpu_infra.c",
     "src/zelda_rtl.c",
     "third_party/gl_core/gl_core_3_1.c",
