@@ -69,6 +69,34 @@ tasks:
         $(sdl2-config --cflags) -DSYSTEM_VOLUME_MIXER_AVAILABLE=0
         {{.SRC}} -o {{trimSuffix ".c" .SRC}}.o
 
+  install:
+    desc: Install SDL2 for the current OS
+    cmds:
+      - task: install:darwin
+      - task: install:linux
+
+  install:darwin:
+    internal: true
+    platforms: [darwin]
+    cmds:
+      - task: _step
+        vars:
+          MSG: "Installing SDL2 (Homebrew)"
+          CMD: "brew install sdl2"
+
+  install:linux:
+    internal: true
+    platforms: [linux]
+    cmds:
+      - task: _step
+        vars:
+          MSG: "Installing SDL2"
+          CMD: >-
+            if command -v apt >/dev/null 2>&1; then sudo apt install -y libsdl2-dev;
+            elif command -v dnf >/dev/null 2>&1; then sudo dnf install -y SDL2-devel;
+            elif command -v pacman >/dev/null 2>&1; then sudo pacman -S --noconfirm sdl2;
+            else echo "Unsupported Linux distro: install libsdl2-dev manually" >&2; exit 1; fi
+
   link-res:
     internal: true
     platforms: [windows]
