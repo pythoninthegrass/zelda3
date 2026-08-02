@@ -60,7 +60,7 @@ HEARTBEAT = BURN / "status" / "state.log"
 REPO = Path(config("BURN_REPO", default=str(Path.home() / "git/zelda3")))
 BRANCH = config("BURN_BRANCH", default="feat/zig-port-burn")
 SECRETS_ENV = Path(config("BURN_SECRETS_ENV", default=str(Path.home() / "git/linux_setup/.env")))
-ORCH_MODEL = config("BURN_ORCH_MODEL", default="accounts/fireworks/models/kimi-k3")
+ORCH_MODEL = config("BURN_ORCH_MODEL", default="accounts/fireworks/models/minimax-m3")
 ORCH_PROVIDER = config("BURN_ORCH_PROVIDER", default="fireworks")
 FALLBACK_MODEL = config("BURN_FALLBACK_MODEL", default="Qwen3.6-27B-MTP-GGUF")
 FALLBACK_PROVIDER = config("BURN_FALLBACK_PROVIDER", default="lemonade")
