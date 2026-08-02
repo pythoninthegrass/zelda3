@@ -39,6 +39,7 @@ pub fn build(b: *std.Build) void {
     });
 
     exe.root_module.addObjectFile(addPortedModule(b, target, optimize, "config"));
+    exe.root_module.addObjectFile(addPortedModule(b, target, optimize, "poly"));
 
     linkSdl2(b, exe_mod);
 
@@ -66,6 +67,7 @@ const unit_test_files = [_][]const u8{
     "src/config_test3.zig",
     "src/config_test4.zig",
     "src/config_test5.zig",
+    "src/poly_test.zig",
 };
 
 // Tier-B differential tests: behavioral-equivalence checks between a
@@ -75,6 +77,7 @@ const unit_test_files = [_][]const u8{
 const diff_test_files = [_][]const u8{
     "src/util_difftest.zig",
     "src/config_difftest.zig",
+    "src/poly_difftest.zig",
 };
 
 fn addTestStep(b: *std.Build, name: []const u8, desc: []const u8, files: []const []const u8, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
@@ -176,6 +179,19 @@ fn addDiffTestStep(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
         "ApplyBps",
     });
 
+    // poly_difftest.zig's C reference: every poly.h entry point renamed to
+    // c_<name>. poly.c's only externs are g_ram/g_zenv, which the test owns.
+    const poly_ref = compileRenamedCRef(b, target, optimize, "poly_c_ref", "src/poly.c", &.{
+        "Poly_Divide",                    "Poly_RunFrame",
+        "Polyhedral_SetShapePointer",     "Polyhedral_SetRotationMatrix",
+        "Polyhedral_OperateRotation",     "Polyhedral_RotatePoint",
+        "Polyhedral_ProjectPoint",        "Polyhedral_DrawPolyhedron",
+        "Polyhedral_SetForegroundColor",  "Polyhedral_CalculateCrossProduct",
+        "Polyhedral_SetColorMask",        "Polyhedral_EmptyBitMapBuffer",
+        "Polyhedral_DrawFace",            "Polyhedral_FillLine",
+        "Polyhedral_SetLeft",             "Polyhedral_SetRight",
+    });
+
     for (&diff_test_files) |file| {
         const test_mod = b.createModule(.{
             .root_source_file = b.path(file),
@@ -199,6 +215,12 @@ fn addDiffTestStep(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
             mod_test.root_module.addObjectFile(config_util_ref);
             mod_test.root_module.addObjectFile(addSdlKeyStub(b, target, optimize));
             mod_test.root_module.addObjectFile(addRenamedSdlKeyStub(b, target, optimize));
+        } else if (std.mem.eql(u8, file, "src/poly_difftest.zig")) {
+            // poly.zig exports the Poly_* symbols; the renamed poly_c_ref
+            // carries the C reference behind c_* names. The test defines
+            // g_ram/g_zenv itself, so both flavours share one buffer.
+            mod_test.root_module.addObjectFile(addPortedModule(b, target, optimize, "poly"));
+            mod_test.root_module.addObjectFile(poly_ref);
         }
         const run_test = b.addRunArtifact(mod_test);
         step.dependOn(&run_test.step);
@@ -283,7 +305,6 @@ const sources = [_][]const u8{
     "src/overworld.c",
     "src/player_oam.c",
     "src/player.c",
-    "src/poly.c",
     "src/select_file.c",
     "src/spc_player.c",
     "src/sprite_main.c",
