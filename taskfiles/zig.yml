@@ -63,6 +63,7 @@ tasks:
       - build.zig
       - build.zig.zon
       - src/**/*.zig
+      - snes/**/*.zig
     cmds:
       - zig build test
 
@@ -72,6 +73,7 @@ tasks:
       - build.zig
       - build.zig.zon
       - src/**/*.zig
+      - snes/**/*.zig
     cmds:
       - zig build difftest
 

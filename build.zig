@@ -41,6 +41,7 @@ pub fn build(b: *std.Build) void {
     exe.root_module.addObjectFile(addPortedModule(b, target, optimize, "config"));
     exe.root_module.addObjectFile(addPortedModule(b, target, optimize, "poly"));
     exe.root_module.addObjectFile(addPortedModule(b, target, optimize, "tile_detect"));
+    exe.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "input", "snes/input.zig"));
 
     linkSdl2(b, exe_mod);
 
@@ -70,6 +71,7 @@ const unit_test_files = [_][]const u8{
     "src/config_test5.zig",
     "src/poly_test.zig",
     "src/tile_detect_test.zig",
+    "snes/input_test.zig",
 };
 
 // Tier-B differential tests: behavioral-equivalence checks between a
@@ -81,6 +83,7 @@ const diff_test_files = [_][]const u8{
     "src/config_difftest.zig",
     "src/poly_difftest.zig",
     "src/tile_detect_difftest.zig",
+    "snes/input_difftest.zig",
 };
 
 fn addTestStep(b: *std.Build, name: []const u8, desc: []const u8, files: []const []const u8, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
@@ -108,12 +111,17 @@ fn addTestStep(b: *std.Build, name: []const u8, desc: []const u8, files: []const
     }
 }
 
-// Compile src/<name>.zig as its own object (a ported C module, exporting the
+// Compile <name>.zig as its own object (a ported C module, exporting the
 // C-ABI symbols the remaining .c files consume) for linking into the exe or
-// a test binary.
+// a test binary. addPortedModule covers the src/*.zig ports; ported snes/
+// modules pass their explicit path through addPortedModuleAt.
 fn addPortedModule(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, name: []const u8) std.Build.LazyPath {
+    return addPortedModuleAt(b, target, optimize, name, b.fmt("src/{s}.zig", .{name}));
+}
+
+fn addPortedModuleAt(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, name: []const u8, path: []const u8) std.Build.LazyPath {
     const mod = b.createModule(.{
-        .root_source_file = b.path(b.fmt("src/{s}.zig", .{name})),
+        .root_source_file = b.path(path),
         .target = target,
         .optimize = optimize,
         .link_libc = true,
@@ -213,6 +221,13 @@ fn addDiffTestStep(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
     const tile_detect_ancilla_stub = compileCStub(b, target, optimize, "tile_detect_ancilla_stub", "other/tile_detect_difftest_stubs/ancilla_stub.c");
     const tile_detect_overworld_stub = compileCStub(b, target, optimize, "tile_detect_overworld_stub", "other/tile_detect_difftest_stubs/overworld_stub.c");
 
+    // input_difftest.zig's C reference: every input.h entry point renamed to
+    // c_<name>. input_free renames cleanly too — its libc free call is a
+    // reference, and objcopy only renames definitions.
+    const input_ref = compileRenamedCRef(b, target, optimize, "input_c_ref", "snes/input.c", &.{
+        "input_init", "input_free", "input_reset", "input_cycle", "input_read",
+    });
+
     for (&diff_test_files) |file| {
         const test_mod = b.createModule(.{
             .root_source_file = b.path(file),
@@ -250,6 +265,13 @@ fn addDiffTestStep(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
             mod_test.root_module.addObjectFile(tile_detect_ref);
             mod_test.root_module.addObjectFile(tile_detect_ancilla_stub);
             mod_test.root_module.addObjectFile(tile_detect_overworld_stub);
+        } else if (std.mem.eql(u8, file, "snes/input_difftest.zig")) {
+            // input.zig exports the plain symbols; the renamed input_c_ref
+            // carries the C reference behind c_* names (input_free's body
+            // stays unrenamed — it is only a libc free wrapper — so the test
+            // frees the C flavour's allocations through the ported one).
+            mod_test.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "input", "snes/input.zig"));
+            mod_test.root_module.addObjectFile(input_ref);
         }
         const run_test = b.addRunArtifact(mod_test);
         step.dependOn(&run_test.step);
@@ -317,18 +339,18 @@ fn compileCStub(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.b
 }
 
 // Same source list as taskfile.yml's SOURCES var: src/*.c + snes/*.c at
-// maxdepth 1 (excludes src/platform/*), plus the two vendored third_party
-// C files the C build compiles. Kept as a static list (rather than directory
+// maxdepth 1 (excludes src/platform/* and the ported util.c/config.c/
+// poly.c/tile_detect.c/input.c), plus the two vendored third_party C files
+// the C build compiles. Kept as a static list (rather than directory
 // iteration) since Zig 0.16's filesystem APIs require plumbing an `Io`
 // instance through build.zig for no benefit here — new .c files are rare and
-// this mirrors `find src snes -maxdepth 1 -name '*.c'` as of this writing.
+// this mirrors the taskfile's `find ... ! -name ...` exclusions.
 const sources = [_][]const u8{
     "snes/apu.c",
     "snes/cart.c",
     "snes/cpu.c",
     "snes/dma.c",
     "snes/dsp.c",
-    "snes/input.c",
     "snes/ppu.c",
     "snes/snes_other.c",
     "snes/snes.c",
