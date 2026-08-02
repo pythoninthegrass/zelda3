@@ -4,6 +4,7 @@ title: Port src/util.c to util.zig (first cross-language proof)
 status: To Do
 assignee: []
 created_date: '2026-08-02 04:19'
+updated_date: '2026-08-02 16:14'
 labels: []
 dependencies:
   - TASK-002.02
@@ -33,3 +34,28 @@ Port src/util.c — a true leaf module with minimal includes — to util.zig as 
 - [ ] #4 The file's C-ABI symbols are unchanged so remaining .c files link without edits
 - [ ] #5 zelda3.bak and the C taskfile.yml build remain untouched and working
 <!-- DOD:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: supervisor
+created: 2026-08-02 16:14
+---
+## Supervisor fix request (2026-08-02, after 2 bailed attempts)
+
+Both automated attempts bailed on the same root cause: `StrFmt`, the one C-variadic function in util.c (`char *StrFmt(const char *fmt, ...)`).
+
+- Attempt 1 tried exporting StrFmt directly from Zig with `std.builtin.VaList` forwarded into vsnprintf — this segfaulted after 3 in-session fix tries.
+- Attempt 2 tried a more careful version: export StrFmt from Zig via `@cVaStart()`, forwarding the resulting va_list by pointer into a small C thunk (StrFmtVa.c) that calls vsnprintf. This is architecturally closer to correct but burned the entire 150-turn budget iterating on VaList type mismatches (VaListX86_64 vs VaList across Zig 0.16) and never finished verification.
+
+Confirmed by grep: `StrFmt` has **zero in-tree callers** (`grep -rn "StrFmt(" src/ --include=*.c --include=*.h` matches nothing outside util.c/util.h). It only needs to exist as a linkable C-ABI symbol — nothing in this repo actually invokes it at runtime, so there is no need to prove correct varargs *behavior*, only correct *linkage*.
+
+Recommended approach for this attempt — skip the VaList interop entirely:
+1. Leave StrFmt itself as a tiny, permanently-C function in a new one-function file (e.g. src/util_strfmt.c), essentially the current 8-line C body verbatim (buf/vsnprintf/strdup). Do not declare or export StrFmt from util.zig at all.
+2. Add that new .c file to build.zig's C source list the same way other not-yet-ported .c files are compiled today (same object, same symbol name, same signature) — zero Zig-side varargs code needed.
+3. Everything else in util.c (NextDelim, StringEqualsNoCase, StringStartsWithNoCase, ReadWholeFile, NextLineStripComments, NextPossiblyQuotedString, ReplaceFilenameWithNewPath, SplitKeyValue, SkipPrefix, StrSet, ByteArray_*, FindIndexInMemblk, ApplyBps, BpsDecodeInt, crc32) has no varargs and should port to util.zig normally.
+4. If the linker drops the now-unreferenced StrFmt symbol under --gc-sections, do not spend turns on forceUndefinedSymbol/undefSymbol tricks — this is a minor bookkeeping concern (AC #2/#3 care about symbol *shape*, not liveness), so the simplest fix (e.g. compiling that one object without section GC, or just leaving it as-is if it links fine) is sufficient. Do not over-engineer it.
+
+Address this note first, then proceed with the rest of the task normally.
+---
+<!-- COMMENTS:END -->
