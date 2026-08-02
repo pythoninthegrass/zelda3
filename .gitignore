@@ -30,6 +30,8 @@ CLAUDE.md
 /SDL2.dll
 /zelda3.*.ini
 /zelda3.wiki
+/zig-out/
+/.zig-cache/
 /sprites-gfx
 /glsl-shaders
 /token.txt
