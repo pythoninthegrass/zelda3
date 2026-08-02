@@ -40,6 +40,7 @@ pub fn build(b: *std.Build) void {
 
     exe.root_module.addObjectFile(addPortedModule(b, target, optimize, "config"));
     exe.root_module.addObjectFile(addPortedModule(b, target, optimize, "poly"));
+    exe.root_module.addObjectFile(addPortedModule(b, target, optimize, "tile_detect"));
 
     linkSdl2(b, exe_mod);
 
@@ -68,6 +69,7 @@ const unit_test_files = [_][]const u8{
     "src/config_test4.zig",
     "src/config_test5.zig",
     "src/poly_test.zig",
+    "src/tile_detect_test.zig",
 };
 
 // Tier-B differential tests: behavioral-equivalence checks between a
@@ -78,6 +80,7 @@ const diff_test_files = [_][]const u8{
     "src/util_difftest.zig",
     "src/config_difftest.zig",
     "src/poly_difftest.zig",
+    "src/tile_detect_difftest.zig",
 };
 
 fn addTestStep(b: *std.Build, name: []const u8, desc: []const u8, files: []const []const u8, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
@@ -192,6 +195,24 @@ fn addDiffTestStep(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
         "Polyhedral_SetLeft",             "Polyhedral_SetRight",
     });
 
+    // tile_detect_difftest.zig's C reference: every tile_detect.h entry point
+    // renamed to c_<name>, plus its cross-module externs (objcopy renames
+    // references too) resolved by the per-module stubs in
+    // other/tile_detect_difftest_stubs/. g_ram/g_zenv are the test's own.
+    const tile_detect_ref = compileRenamedCRef(b, target, optimize, "tile_detect_c_ref", "src/tile_detect.c", &.{
+        "Overworld_GetTileAttributeAtLocation", "TileDetect_Movement_Y",
+        "TileDetect_Movement_X",                "TileDetect_Movement_VerticalSlopes",
+        "TileDetect_Movement_HorizontalSlopes", "Player_TileDetectNearby",
+        "Hookshot_CheckTileCollision",          "Hookshot_CheckSingleLayerTileCollision",
+        "HandleNudgingInADoor",                 "TileCheckForMirrorBonk",
+        "TileDetect_SwordSwingDeepInDoor",      "TileDetect_ResetState",
+        "TileDetection_Execute",                "TileDetect_ExecuteInner",
+        "GetMap16toMap8Table",                  "GetMap8toTileAttr",
+        "Ancilla_GetX",                         "Ancilla_GetY",
+    });
+    const tile_detect_ancilla_stub = compileCStub(b, target, optimize, "tile_detect_ancilla_stub", "other/tile_detect_difftest_stubs/ancilla_stub.c");
+    const tile_detect_overworld_stub = compileCStub(b, target, optimize, "tile_detect_overworld_stub", "other/tile_detect_difftest_stubs/overworld_stub.c");
+
     for (&diff_test_files) |file| {
         const test_mod = b.createModule(.{
             .root_source_file = b.path(file),
@@ -221,6 +242,14 @@ fn addDiffTestStep(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
             // g_ram/g_zenv itself, so both flavours share one buffer.
             mod_test.root_module.addObjectFile(addPortedModule(b, target, optimize, "poly"));
             mod_test.root_module.addObjectFile(poly_ref);
+        } else if (std.mem.eql(u8, file, "src/tile_detect_difftest.zig")) {
+            // tile_detect.zig exports the plain symbols; the renamed
+            // tile_detect_c_ref carries the C reference behind c_* names,
+            // its cross-module calls satisfied by the per-module stubs.
+            mod_test.root_module.addObjectFile(addPortedModule(b, target, optimize, "tile_detect"));
+            mod_test.root_module.addObjectFile(tile_detect_ref);
+            mod_test.root_module.addObjectFile(tile_detect_ancilla_stub);
+            mod_test.root_module.addObjectFile(tile_detect_overworld_stub);
         }
         const run_test = b.addRunArtifact(mod_test);
         step.dependOn(&run_test.step);
@@ -270,6 +299,23 @@ fn compileRenamedCRef(b: *std.Build, target: std.Build.ResolvedTarget, optimize:
     return objcopy.addOutputFileArg(b.fmt("{s}_renamed.o", .{name}));
 }
 
+// Compile a difftest-side C stub (a per-module shim satisfying a renamed C
+// reference's cross-module externs) to an object for mod_test.addObjectFile.
+fn compileCStub(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, name: []const u8, src: []const u8) std.Build.LazyPath {
+    const mod = b.createModule(.{
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
+    mod.addIncludePath(b.path("."));
+    mod.addCSourceFile(.{ .file = b.path(src) });
+    const obj = b.addObject(.{
+        .name = name,
+        .root_module = mod,
+    });
+    return obj.getEmittedBin();
+}
+
 // Same source list as taskfile.yml's SOURCES var: src/*.c + snes/*.c at
 // maxdepth 1 (excludes src/platform/*), plus the two vendored third_party
 // C files the C build compiles. Kept as a static list (rather than directory
@@ -310,7 +356,6 @@ const sources = [_][]const u8{
     "src/sprite_main.c",
     "src/sprite.c",
     "src/tagalong.c",
-    "src/tile_detect.c",
     "src/util_strfmt.c",
     "src/zelda_cpu_infra.c",
     "src/zelda_rtl.c",
