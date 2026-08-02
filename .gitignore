@@ -3,6 +3,7 @@ CLAUDE.md
 /.vs/
 /packages/
 *.dSYM
+*.bak
 /*.vcxproj.user
 *.aps
 /obj/
