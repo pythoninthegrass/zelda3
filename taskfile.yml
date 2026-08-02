@@ -79,6 +79,95 @@ tasks:
       - task: install:darwin
       - task: install:linux
 
+  playtest:linux:
+    desc: Install headless-Wayland playtest tooling (sway + wtype + grim) for driving zelda3 headlessly on Linux
+    platforms: [linux]
+    cmds:
+      - task: _step
+        vars:
+          MSG: "Installing headless-Wayland playtest tooling (sway + wtype + grim)"
+          CMD: |
+            set -e
+            # Idempotent: skip anything already on PATH (packaged or previously source-built).
+            need_sway=$(command -v sway >/dev/null 2>&1 && echo no || echo yes)
+            need_wtype=$(command -v wtype >/dev/null 2>&1 && echo no || echo yes)
+            need_grim=$(command -v grim >/dev/null 2>&1 && echo no || echo yes)
+            if [ "$need_sway" = no ] && [ "$need_wtype" = no ] && [ "$need_grim" = no ]; then
+              echo "sway, wtype, and grim already installed; nothing to do."
+              exit 0
+            fi
+
+            if command -v apt >/dev/null 2>&1; then
+              pkgs=""
+              [ "$need_sway" = yes ] && pkgs="$pkgs sway"
+              [ "$need_wtype" = yes ] && pkgs="$pkgs wtype"
+              [ "$need_grim" = yes ] && pkgs="$pkgs grim"
+              sudo apt install -y $pkgs
+            elif command -v pacman >/dev/null 2>&1; then
+              pkgs=""
+              [ "$need_sway" = yes ] && pkgs="$pkgs sway"
+              [ "$need_wtype" = yes ] && pkgs="$pkgs wtype"
+              [ "$need_grim" = yes ] && pkgs="$pkgs grim"
+              sudo pacman -S --noconfirm --needed $pkgs
+            elif command -v dnf >/dev/null 2>&1; then
+              # EL10/Fedora: none of these are packaged for EL10, so build from source into /usr/local.
+              sudo dnf install -y epel-release || true
+              sudo dnf install -y \
+                git meson ninja-build cmake gcc gcc-c++ scdoc pkgconf-pkg-config \
+                wlroots-devel json-c-devel cairo-devel pango-devel gdk-pixbuf2-devel \
+                libevdev-devel libinput-devel pixman-devel libpng-devel \
+                wayland-devel wayland-protocols-devel libxkbcommon-devel
+              WORK=$(mktemp -d)
+              build_meson() {
+                name=$1; url=$2; branch=$3; shift 3
+                echo "Building $name from source"
+                git clone --branch "$branch" --depth 1 "$url" "$WORK/$name"
+                ( cd "$WORK/$name" \
+                  && meson setup build --prefix=/usr/local "$@" \
+                  && ninja -C build \
+                  && sudo ninja -C build install )
+              }
+              if [ "$need_sway" = yes ]; then
+                build_meson sway https://github.com/swaywm/sway.git v1.10.1 \
+                  -Dtray=disabled -Dwerror=false -Dman-pages=disabled
+              fi
+              if [ "$need_wtype" = yes ]; then
+                build_meson wtype https://github.com/atx/wtype.git master
+              fi
+              if [ "$need_grim" = yes ]; then
+                build_meson grim https://github.com/emersion/grim.git v1.4.1
+              fi
+              sudo ldconfig
+              rm -rf "$WORK"
+            else
+              echo "Unsupported Linux distro: install sway, wtype, and grim manually" >&2
+              exit 1
+            fi
+
+  playtest:macos:
+    desc: Verify macOS playtest tooling (osascript + screencapture, both built-in) and required privacy permissions
+    platforms: [darwin]
+    cmds:
+      - task: _step
+        vars:
+          MSG: "Checking macOS playtest tooling (osascript + screencapture)"
+          CMD: |
+            # osascript (System Events key injection) and screencapture (-x screenshots) ship with macOS;
+            # nothing to install. This task just verifies they're present and reminds about the one
+            # non-programmatic step: the driving terminal needs Accessibility + Screen Recording grants.
+            missing=0
+            for b in osascript screencapture; do
+              if command -v "$b" >/dev/null 2>&1; then
+                echo "  $b: $(command -v "$b")"
+              else
+                echo "  $b: MISSING (expected a built-in macOS tool)" >&2
+                missing=1
+              fi
+            done
+            [ "$missing" -eq 0 ] || exit 1
+            echo "Grant your terminal app Accessibility + Screen Recording in"
+            echo "System Settings > Privacy & Security so osascript/screencapture can drive zelda3."
+
   install:darwin:
     internal: true
     platforms: [darwin]

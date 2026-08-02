@@ -38,6 +38,43 @@ CC=clang task           # use a specific compiler
 There is no test suite; correctness is validated by running the game with the original ROM loaded and
 watching for RAM-compare mismatches (see "RAM-compare verification" below), and by manual play-testing.
 
+### Interactive playtest verification
+
+Some verification (e.g. exercising `LoadRef`/`ReplayRef` reference-save hotkeys, or visually confirming
+a screen) requires driving the real SDL window rather than just running the RAM-compare oracle headless.
+
+- macOS: `osascript`/System Events synthesizing key codes into the frontmost `zelda3` process, plus
+  `screencapture -x` for screenshots. Works but is brittle (relies on the app being frontmost, numeric
+  key-code mapping, and no window-manager focus quirks intervening).
+- Linux (AlmaLinux, `mf` host): headless Wayland via **sway + wtype + grim**. EL10/EPEL10 dropped the
+  classic X.org server (Wayland-only), so `Xvfb`/`xdotool` are unavailable and `ydotool` (uinput) does
+  *not* work — a headless `wlroots` compositor runs no libinput backend, so uinput events never reach
+  clients. The working recipe (all three built from source; `task playtest:linux` installs them):
+  1. Run `sway` headless, with a config that sizes the output and execs the game:
+
+     ```sh
+     # zelda-sway.conf
+     output HEADLESS-1 resolution 1024x896
+     exec sh -c 'cd /home/lance/git/zelda3 && \
+       exec env SDL_VIDEODRIVER=wayland SDL_AUDIODRIVER=dummy ./zelda3'
+     ```
+
+     ```sh
+     WLR_BACKENDS=headless WLR_RENDERER=pixman sway -c zelda-sway.conf &
+     ```
+
+     The app must render frames — a Wayland surface is only mapped/focusable once it commits a buffer,
+     so anything that draws (zelda3 does every frame) gets keyboard focus automatically.
+  2. Inject keys with `wtype` (virtual-keyboard protocol), targeting the compositor's `WAYLAND_DISPLAY`
+     (e.g. `wayland-1`). A lone `wtype` call loses a bind race, so either send one-shot with a leading
+     sleep (`wtype -s 1000 -k Return`) or start one persistent holder (`wtype -s 600000 &`) at session
+     start and then issue instant plain `wtype`/`wtype -k <Keysym>` calls. Default keymap:
+     `Return`=Start, arrows=D-pad, `x`=A, `z`=B, `s`=X, `a`=Y, `c`=L, `v`=R.
+  3. Capture with `grim` (wlr-screencopy): `grim out.png` — the `screencapture -x` equivalent.
+
+  Persistent host setup already applied on `mf`: `seatd` enabled, `lance` in `input`+`seat` groups,
+  `/dev/uinput` udev rule + `modules-load.d/uinput.conf` (only relevant to ydotool, kept for reference).
+
 ## Architecture
 
 ### Layout
