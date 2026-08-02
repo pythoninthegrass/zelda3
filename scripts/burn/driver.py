@@ -41,6 +41,7 @@ Usage:
 import argparse
 import os
 import re
+import shutil
 import signal
 import subprocess
 import sys
@@ -383,6 +384,9 @@ def cmd_run(once: bool, push: bool) -> int:
         wt = BURN / "wt" / task
         subprocess.run(["git", "worktree", "remove", "--force", str(wt)], cwd=REPO, check=False, capture_output=True)
         git("worktree", "add", "--detach", str(wt), BRANCH)
+        rom = REPO / "zelda3.sfc"
+        if rom.is_file():
+            shutil.copy2(rom, wt / "zelda3.sfc")
         md = task_md(wt, task)
         prompt_file = BURN / "prompts" / f"{task}.txt"
         prompt_file.write_text(header + "\n\n=== TASK FILE ===\n" + md.read_text())
