@@ -46,7 +46,9 @@ pub fn build(b: *std.Build) void {
 // Tier-A unit tests for ported Zig modules (zig build test). Empty until a
 // C module is ported to idiomatic Zig; each port task appends its own
 // .zig test file here rather than this being wired up speculatively.
-const unit_test_files = [_][]const u8{};
+const unit_test_files = [_][]const u8{
+    "src/types_test.zig",
+};
 
 // Tier-B differential tests: behavioral-equivalence checks between a
 // pre-port C object (symbols renamed via objcopy) and its ported .zig
