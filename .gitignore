@@ -17,10 +17,12 @@ CLAUDE.md
 /saves/sram.dat
 /saves/sram.bak
 /zelda3
+/zelda3.res
 /src/*.o
 /*.exe
 /*.out
 /snes/*.o
+/.task/
 /msu/
 /tmp/
 /zelda3_assets.dat
