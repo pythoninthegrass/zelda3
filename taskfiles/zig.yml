@@ -1,0 +1,58 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: "3.0"
+
+vars:
+  ZIG_BIN: zig-out/bin/zelda3
+
+tasks:
+  build:
+    desc: Compile the zelda3 binary via build.zig (parity with `task build`)
+    sources:
+      - build.zig
+      - build.zig.zon
+      - src/**/*.c
+      - src/**/*.h
+      - snes/**/*.c
+      - snes/**/*.h
+    generates:
+      - "{{.ZIG_BIN}}"
+    cmds:
+      - zig build
+
+  run:
+    desc: Build and run the Zig-built zelda3 binary
+    deps: [build]
+    cmds:
+      - zig build run
+
+  clean:
+    desc: Remove Zig build artifacts (zig-out/, .zig-cache/)
+    cmds:
+      - rm -rf zig-out .zig-cache
+
+  parity:
+    desc: Run the Zig-built binary against zelda3.sfc and report RAM-compare pass/fail
+    deps:
+      - task: build
+      - task: :assets
+    cmds:
+      - |
+        set +e
+        LOG="$(mktemp)"
+        timeout 10s "{{.ZIG_BIN}}" zelda3.sfc >"$LOG" 2>&1
+        status=$?
+        if [ "$status" -ne 0 ] && [ "$status" -ne 124 ]; then
+          echo "zelda3 exited with status $status" >&2
+          cat "$LOG" >&2
+          rm -f "$LOG"
+          exit 1
+        fi
+        if grep -q "Memory compare failed" "$LOG"; then
+          echo "PARITY FAILED: RAM-compare mismatches detected" >&2
+          grep "Memory compare failed" "$LOG" >&2
+          rm -f "$LOG"
+          exit 1
+        fi
+        echo "PARITY OK: zero RAM-compare mismatches"
+        rm -f "$LOG"
