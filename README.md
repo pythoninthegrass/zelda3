@@ -85,20 +85,21 @@ Asset extraction scripts declare their own dependencies (Pillow, PyYAML) via inl
 * macOS: `brew install sdl2` (you can get homebrew [here](https://brew.sh/))
 
 ## Compiling on Linux/MacOS
-1. Place your US ROM file named `zelda3.sfc` in `zelda3`
-2. Compile
+1. Install [Task](https://taskfile.dev/installation/) (a `Taskfile.dev` task runner used instead of `make`)
+2. Place your US ROM file named `zelda3.sfc` in `zelda3`
+3. Compile
 ```sh
-make
+task
 ```
 <details>
 <summary>
-Advanced make usage ...
+Advanced task usage ...
 </summary>
 
 ```sh
-make -j$(nproc) # run on all core
-make clean all  # clear gen+obj and rebuild
-CC=clang make   # specify compiler
+task build          # compile only, skip asset extraction
+task clean build    # clear gen+obj and rebuild
+CC=clang task       # specify compiler
 ```
 </details>
 
