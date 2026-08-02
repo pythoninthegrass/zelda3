@@ -1,10 +1,10 @@
 ---
 id: TASK-002.04
 title: Port src/config.c to config.zig
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-02 04:19'
-updated_date: '2026-08-02 19:57'
+updated_date: '2026-08-02 20:39'
 labels: []
 dependencies:
   - TASK-002.03
@@ -20,18 +20,18 @@ Port src/config.c (INI config parsing for zelda3.ini) to idiomatic Zig, followin
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 config.c is removed from the C build and config.zig is compiled instead
-- [ ] #2 zelda3.ini parsing behavior is unchanged (all documented settings still take effect)
-- [ ] #3 Full parity verification passes (build clean, zero RAM-compare mismatches, reference-save replay clean)
+- [x] #1 config.c is removed from the C build and config.zig is compiled instead
+- [x] #2 zelda3.ini parsing behavior is unchanged (all documented settings still take effect)
+- [x] #3 Full parity verification passes (build clean, zero RAM-compare mismatches, reference-save replay clean)
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 task zig:build compiles clean
-- [ ] #2 Running the binary with zelda3.sfc loaded shows zero 'Memory compare failed' lines on stderr (RAM-compare oracle)
-- [ ] #3 Replay of reference saves (saves/ref/Chapter*.sav) stays clean
-- [ ] #4 The file's C-ABI symbols are unchanged so remaining .c files link without edits
-- [ ] #5 zelda3.bak and the C taskfile.yml build remain untouched and working
+- [x] #1 task zig:build compiles clean
+- [x] #2 Running the binary with zelda3.sfc loaded shows zero 'Memory compare failed' lines on stderr (RAM-compare oracle)
+- [x] #3 Replay of reference saves (saves/ref/Chapter*.sav) stays clean
+- [x] #4 The file's C-ABI symbols are unchanged so remaining .c files link without edits
+- [x] #5 zelda3.bak and the C taskfile.yml build remain untouched and working
 <!-- DOD:END -->
 
 ## Comments
