@@ -4,6 +4,7 @@ title: Port src/types.h to types.zig (base types + aliasing helpers)
 status: To Do
 assignee: []
 created_date: '2026-08-02 04:19'
+updated_date: '2026-08-02 07:58'
 labels: []
 dependencies:
   - TASK-001.04
@@ -32,3 +33,9 @@ Port src/types.h's base integer typedefs and the type-punning helper macros BYTE
 - [ ] #4 The file's C-ABI symbols are unchanged so remaining .c files link without edits
 - [ ] #5 zelda3.bak and the C taskfile.yml build remain untouched and working
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+types.zig: u8/u16/... typedefs, kEnableLargeScreen/kPpuExtraLeftRight/kDebugFlag consts, BYTE/HIBYTE/WORD/DWORD/load24 as inline generic fns returning *align(1) pointers (read via .*, assign through the pointer) so odd g_ram offsets work; abs8/abs16/IntMin/IntMax/UintMin/UintMax/swap16/sign8/sign16/arraysize/countof/xy helpers; C-ABI extern struct twins for Point16U/PointU8/Pair16U/PairU8/ProjectSpeedRet/OamEnt/MemBlk with comptime layout asserts. types_test.zig Tier-A tests added to unit_test_files. Tier-B difftest skipped: types.h has no linkable symbols (header-only inlines/macros), so there is no C object to diff against. No .c file changes; types.h left in place for remaining C TUs.
+<!-- SECTION:NOTES:END -->
