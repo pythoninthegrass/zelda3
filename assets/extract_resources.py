@@ -1,3 +1,15 @@
+#!/usr/bin/env -S uv run --script
+
+# /// script
+# requires-python = ">=3.9"
+# dependencies = [
+#     "Pillow",
+#     "PyYAML",
+# ]
+# [tool.uv]
+# exclude-newer = "2026-08-01T00:00:00Z"
+# ///
+
 from ast import literal_eval as make_tuple
 import sys
 import text_compression

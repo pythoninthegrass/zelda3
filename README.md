@@ -40,17 +40,17 @@ Option 2: Building it yourself
 
 Visit Wiki for more info on building the project: https://github.com/snesrev/zelda3/wiki
 
-## Installing Python & libraries on Windows (required for asset extraction steps)
-1. Download [Python](https://www.python.org/ftp/python/3.11.1/python-3.11.1-amd64.exe) installer and install with "Add to PATH" checkbox checked
-2. Open the command prompt
-3. Type `python -m pip install --upgrade pip pillow pyyaml` and hit enter
-4. Close the command prompt
+## Installing uv on Windows (required for asset extraction steps)
+1. Install [uv](https://docs.astral.sh/uv/getting-started/installation/): `powershell -c "irm https://astral.sh/uv/install.ps1 | iex"`
+2. Close and reopen the command prompt
+
+Asset extraction scripts declare their own dependencies (Pillow, PyYAML) via inline PEP 723 metadata, so `uv run` installs them automatically the first time a script runs — no separate pip install step needed.
 
 ## Compiling on Windows with TCC (1mb Tiny C Compiler)
 1. Download the project by clicking "Code > Download ZIP" on the github page
 2. Extract the ZIP to your hard drive
 3. Place the USA rom named `zelda3.sfc` in the root directory.
-4. Double-click `extract_assets.bat` in the main dir to create `zelda3_assets.dat` in that same dir
+4. Run `uv run assets/restool.py --extract-from-rom` in the main dir to create `zelda3_assets.dat` in that same dir
 5. Download [TCC](https://github.com/FitzRoyX/tinycc/releases/download/tcc_20221020/tcc_20221020.zip) and extract to the "\third_party" subfolder
 6. Download [SDL2](https://github.com/libsdl-org/SDL/releases/download/release-2.26.3/SDL2-devel-2.26.3-VC.zip) and extract to the "\third_party" subfolder
 7. Double-click `run_with_tcc.bat` in the main dir to create `zelda3.exe` in that same dir
@@ -64,22 +64,21 @@ Same Steps 1-4 above<br/>
 12. Choose "build > build Zelda3" in the menu to create `zelda3.exe` in the "/bin/release" subfolder<br/>
 13. Configure with `zelda3.ini` in the main dir<br/>
 
-## Installing libraries on Linux/MacOS
+## Installing uv & SDL2 on Linux/MacOS
 1. Open a terminal
-2. Install pip if not already installed
+2. Install [uv](https://docs.astral.sh/uv/getting-started/installation/) if not already installed
 ```sh
-python3 -m ensurepip
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 3. Clone the repo and `cd` into it
 ```sh
 git clone https://github.com/snesrev/zelda3
 cd zelda3
 ```
-4. Install requirements using pip
-```sh
-python3 -m pip install -r requirements.txt
-```
-5. Install SDL2
+
+Asset extraction scripts declare their own dependencies (Pillow, PyYAML) via inline PEP 723 metadata, so `uv run` installs them automatically the first time a script runs — no separate pip install step needed.
+
+4. Install SDL2
 * Ubuntu/Debian `sudo apt install libsdl2-dev`
 * Fedora Linux `sudo dnf install SDL2-devel`
 * Arch Linux `sudo pacman -S sdl2`
