@@ -56,3 +56,90 @@ tasks:
         fi
         echo "PARITY OK: zero RAM-compare mismatches"
         rm -f "$LOG"
+
+  test:
+    desc: Run Tier-A unit tests for ported Zig modules (zig build test); no-op until a module exists
+    sources:
+      - build.zig
+      - build.zig.zon
+      - src/**/*.zig
+    cmds:
+      - zig build test
+
+  difftest:
+    desc: Run Tier-B differential tests (C-vs-Zig behavioral equivalence) for ported Zig modules; no-op until a module exists
+    sources:
+      - build.zig
+      - build.zig.zon
+      - src/**/*.zig
+    cmds:
+      - zig build difftest
+
+  parity-replay:
+    desc: Replay every saves/ref/Chapter*.sav reference save under headless Wayland (sway+wtype+grim) and fail on any RAM-compare mismatch
+    platforms: [linux]
+    deps:
+      - task: build
+      - task: :assets
+      - task: :playtest:linux
+    vars:
+      REPLAY_SECONDS: '{{.REPLAY_SECONDS | default "12"}}'
+    cmds:
+      - |
+        set +e
+        WORKDIR="$(mktemp -d)"
+        INI="$WORKDIR/zelda3-verify.ini"
+        sed -e "s/^#LoadRef = /LoadRef = /" -e "s/^#ReplayRef = /ReplayRef = /" zelda3.ini > "$INI"
+
+        SWAY_CONF="$WORKDIR/zelda-sway.conf"
+        LOG="$WORKDIR/zelda-verify.log"
+        cat > "$SWAY_CONF" <<EOF
+        output HEADLESS-1 resolution 1024x896
+        exec sh -c "cd {{.ROOT_DIR}} && exec env SDL_VIDEODRIVER=wayland SDL_AUDIODRIVER=dummy ./{{.ZIG_BIN}} --config $INI zelda3.sfc" > $LOG 2>&1
+        EOF
+
+        pkill -9 -x zelda3 2>/dev/null
+        pkill -9 -x sway 2>/dev/null
+        pkill -9 -x wtype 2>/dev/null
+        sleep 1
+
+        setsid nohup env WLR_BACKENDS=headless WLR_RENDERER=pixman sway -c "$SWAY_CONF" >"$WORKDIR/sway.log" 2>&1 < /dev/null &
+        sleep 3
+
+        SOCK="$(ls "$XDG_RUNTIME_DIR"/wayland-[0-9]* 2>/dev/null | head -1)"
+        if [ -z "$SOCK" ]; then
+          echo "PARITY-REPLAY FAILED: no Wayland socket found; sway did not start" >&2
+          cat "$WORKDIR/sway.log" >&2
+          exit 1
+        fi
+        export WAYLAND_DISPLAY="$(basename "$SOCK")"
+
+        setsid nohup wtype -s 600000 >/dev/null 2>&1 < /dev/null &
+        WTYPE_HOLD_PID=$!
+        sleep 1
+
+        FAIL=0
+        COUNT=0
+        for k in 1 2 3 4 5 6 7 8 9 0 minus equal BackSpace; do
+          wtype -M ctrl -k "$k" -m ctrl
+          sleep "{{.REPLAY_SECONDS}}"
+          COUNT=$((COUNT + 1))
+          if grep -q "Memory compare failed" "$LOG"; then
+            FAIL=1
+            break
+          fi
+        done
+
+        kill -9 "$WTYPE_HOLD_PID" 2>/dev/null
+        pkill -9 -x zelda3 2>/dev/null
+        pkill -9 -x sway 2>/dev/null
+        pkill -9 -x wtype 2>/dev/null
+
+        if [ "$FAIL" -eq 1 ]; then
+          echo "PARITY-REPLAY FAILED: RAM-compare mismatch during reference-save replay ($COUNT/13 chapters injected)" >&2
+          grep "Memory compare failed" "$LOG" >&2
+          rm -rf "$WORKDIR"
+          exit 1
+        fi
+        echo "PARITY-REPLAY OK: zero RAM-compare mismatches across $COUNT reference-save replays"
+        rm -rf "$WORKDIR"
