@@ -2,7 +2,7 @@ project_name: "zelda3"
 default_status: "To Do"
 statuses: ["To Do", "In Progress", "Done"]
 labels: []
-definition_of_done: []
+definition_of_done: ["task zig:build compiles clean", "Running the binary with zelda3.sfc loaded shows zero 'Memory compare failed' lines on stderr (RAM-compare oracle)", "Replay of reference saves (saves/ref/Chapter*.sav) stays clean", "The file's C-ABI symbols are unchanged so remaining .c files link without edits", "zelda3.bak and the C taskfile.yml build remain untouched and working"]
 date_format: yyyy-mm-dd
 max_column_width: 20
 default_editor: "vim"
