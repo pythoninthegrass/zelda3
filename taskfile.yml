@@ -21,10 +21,11 @@ vars:
   CFLAGS: '{{.CFLAGS | default "-O2 -Werror"}}'
   SOURCES:
     sh: |
-      # util.c, config.c and poly.c are ported to Zig (src/util.zig,
-      # src/config.zig, src/poly.zig); util_strfmt.c keeps the C-variadic
-      # StrFmt in C. The Zig sides are compiled by the compile-zig-* tasks.
-      { find src snes -maxdepth 1 -name '*.c' ! -name 'util.c' ! -name 'config.c' ! -name 'poly.c'; \
+      # util.c, config.c, poly.c and tile_detect.c are ported to Zig
+      # (src/util.zig, src/config.zig, src/poly.zig, src/tile_detect.zig);
+      # util_strfmt.c keeps the C-variadic StrFmt in C. The Zig sides are
+      # compiled by the compile-zig-* tasks.
+      { find src snes -maxdepth 1 -name '*.c' ! -name 'util.c' ! -name 'config.c' ! -name 'poly.c' ! -name 'tile_detect.c'; \
         echo third_party/gl_core/gl_core_3_1.c; \
         echo third_party/opus-1.3.1-stripped/opus_decoder_amalgam.c; } | sort
 
@@ -50,6 +51,7 @@ tasks:
       - compile-zig-util
       - compile-zig-config
       - compile-zig-poly
+      - compile-zig-tile_detect
     vars:
       OBJS:
         sh: echo '{{.SOURCES}}' | sed 's/\.c/.o/g' | tr '\n' ' '
@@ -63,7 +65,7 @@ tasks:
     cmds:
       - task: link-res
       - >-
-        {{.CC}} {{.OBJS}} src/util.o src/config.o src/poly.o
+        {{.CC}} {{.OBJS}} src/util.o src/config.o src/poly.o src/tile_detect.o
         {{if eq OS "windows"}}zelda3.res{{end}}
         -o {{.TARGET_EXEC}} {{.LDFLAGS}}
         {{if eq OS "windows"}}-Wl,-Bstatic $(sdl2-config --static-libs){{else}}$(sdl2-config --libs) -lm{{end}}
@@ -89,6 +91,17 @@ tasks:
       - >-
         zig build-obj -O ReleaseFast -lc
         -femit-bin=src/poly.o src/poly.zig
+
+  compile-zig-tile_detect:
+    internal: true
+    label: compile-zig-tile_detect
+    desc: Compile src/tile_detect.zig to src/tile_detect.o (the ported half of tile_detect.c) for the C link
+    sources: ['src/tile_detect.zig', 'src/types.zig', 'src/variables.zig']
+    generates: ['src/tile_detect.o']
+    cmds:
+      - >-
+        zig build-obj -O ReleaseFast -lc
+        -femit-bin=src/tile_detect.o src/tile_detect.zig
 
   compile-zig-util:
     internal: true
@@ -292,7 +305,7 @@ tasks:
   clean:obj:
     desc: Remove object files and the compiled binary
     cmds:
-      - rm -f src/*.o src/util.o src/config.o snes/*.o third_party/gl_core/*.o third_party/opus-1.3.1-stripped/*.o zelda3.res {{.TARGET_EXEC}}
+      - rm -f src/*.o src/util.o src/config.o src/tile_detect.o snes/*.o third_party/gl_core/*.o third_party/opus-1.3.1-stripped/*.o zelda3.res {{.TARGET_EXEC}}
 
   clean:gen:
     desc: Remove generated assets and extracted tables
