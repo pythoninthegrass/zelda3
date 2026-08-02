@@ -1,0 +1,96 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(~/.local/bin/mise *)",
+      "Bash(cargo:*)",
+      "Bash(cat:*)",
+      "Bash(deno fmt:*)",
+      "Bash(deno install:*)",
+      "Bash(deno lint:*)",
+      "Bash(fd:*)",
+      "Bash(gh api *)",
+      "Bash(gh issue *)",
+      "Bash(gh pr *)",
+      "Bash(gh run *)",
+      "Bash(gh secret *)",
+      "Bash(git add:*)",
+      "Bash(git bisect:*)",
+      "Bash(git checkout:*)",
+      "Bash(git commit:*)",
+      "Bash(git log:*)",
+      "Bash(git push:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git rev-list:*)",
+      "Bash(git revert:*)",
+      "Bash(git show:*)",
+      "Bash(git switch:*)",
+      "Bash(head:*)",
+      "Bash(ln:*)",
+      "Bash(ls:*)",
+      "Bash(lsof:*)",
+      "Bash(markdownlint:*)",
+      "Bash(node node_modules/.bin/vitest run:*)",
+      "Bash(npm:*)",
+      "Bash(npx:*)",
+      "Bash(prek:*)",
+      "Bash(pytest:*)",
+      "Bash(python*:*)",
+      "Bash(python3:*)",
+      "Bash(rg:*)",
+      "Bash(rtk *)",
+      "Bash(ruff:*)",
+      "Bash(sort:*)",
+      "Bash(sqlite3:*)",
+      "Bash(ssh:*)",
+      "Bash(task:*)",
+      "Bash(tee:*)",
+      "Bash(timeout:*)",
+      "Bash(tree:*)",
+      "Bash(uv:*)",
+      "Bash(zig:*)",
+      "Bash(~/.local/bin/mise:*)",
+      "mcp__backlog__get_task_creation_guide",
+      "mcp__backlog__get_workflow_overview",
+      "mcp__backlog__task_create",
+      "mcp__backlog__task_list",
+      "mcp__backlog__task_search",
+      "mcp__backlog__task_view",
+      "mcp__context7__query-docs",
+      "mcp__plugin_context-mode_context-mode__ctx_batch_execute",
+      "mcp__plugin_context-mode_context-mode__ctx_execute",
+      "mcp__plugin_context-mode_context-mode__ctx_fetch_and_index",
+      "mcp__plugin_context-mode_context-mode__ctx_search",
+      "mcp__screencap__screenshot_app",
+      "mcp__sequential-thinking__sequentialthinking",
+      "mcp__serena__activate_project",
+      "mcp__serena__find_file",
+      "mcp__serena__find_referencing_symbols",
+      "mcp__serena__get_current_config",
+      "mcp__serena__initial_instructions",
+      "mcp__serena__list_dir",
+      "mcp__serena__read_memory",
+      "mcp__serena__think_about_task_adherence",
+      "Read(//tmp/**)",
+      "Read(//Users/*/Desktop/**)",
+      "Read(//Users/*/Downloads/**)",
+      "WebSearch"
+    ],
+    "deny": []
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "SKIP=cargo-clippy sh -c 'git diff --name-only HEAD | xargs -r prek run --files'"
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {
+    "document-skills@anthropic-agent-skills": true
+  }
+}
