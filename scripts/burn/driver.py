@@ -321,7 +321,31 @@ def verify(task: str, wt: Path, log: Path, env: dict) -> Verdict:
     gate_verdict = run_gates(wt, env)
     if not gate_verdict.ok:
         return gate_verdict
+    ensure_backlog_done(task, wt)
     return Verdict(True, f"{commits} commits, {gate_verdict.reason}")
+
+
+def ensure_backlog_done(task: str, wt: Path) -> None:
+    """Force the task's backlog status to Done in the worktree before merge.
+
+    A worker that hits --max-turns mid-run gets forced into a final summary
+    turn: it can print the TASK:DONE marker and describe having run
+    `backlog task edit ... -s Done` without that tool call actually executing.
+    Gates already passed and code is already committed at this point, so the
+    work is real -- but next_ready() reads task status from disk, and a task
+    left "To Do" gets handed straight back out for a redundant re-run. Belt
+    and braces: check status and fix it here rather than trust self-report.
+    """
+    tasks = load_tasks(wt)
+    if tasks.get(task, Task("", "")).status == "Done":
+        return
+    backlog("task", "edit", task, "-s", "Done", cwd=wt, check=False)
+    git("add", TASKS_DIR, cwd=wt, check=False)
+    git(
+        "commit", "-m",
+        f"chore(backlog): force-mark {task} done (gates green, worker turn-capped before its own bookkeeping ran)",
+        cwd=wt, check=False,
+    )
 
 
 def merge_local(wt: Path, push: bool) -> bool:
