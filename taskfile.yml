@@ -171,6 +171,8 @@ tasks:
   install:darwin:
     internal: true
     platforms: [darwin]
+    status:
+      - command -v sdl2-config >/dev/null 2>&1
     cmds:
       - task: _step
         vars:
@@ -180,6 +182,8 @@ tasks:
   install:linux:
     internal: true
     platforms: [linux]
+    status:
+      - command -v sdl2-config >/dev/null 2>&1
     cmds:
       - task: _step
         vars:
