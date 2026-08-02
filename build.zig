@@ -48,6 +48,7 @@ pub fn build(b: *std.Build) void {
 // .zig test file here rather than this being wired up speculatively.
 const unit_test_files = [_][]const u8{
     "src/types_test.zig",
+    "src/variables_test.zig",
 };
 
 // Tier-B differential tests: behavioral-equivalence checks between a
