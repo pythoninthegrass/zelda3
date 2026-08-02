@@ -38,6 +38,36 @@ pub fn build(b: *std.Build) void {
 
     const run_step = b.step("run", "Run the zelda3 binary");
     run_step.dependOn(&run_cmd.step);
+
+    addTestStep(b, "test", "Run Tier-A unit tests for ported Zig modules", &unit_test_files, target, optimize);
+    addTestStep(b, "difftest", "Run Tier-B differential tests for ported Zig modules", &diff_test_files, target, optimize);
+}
+
+// Tier-A unit tests for ported Zig modules (zig build test). Empty until a
+// C module is ported to idiomatic Zig; each port task appends its own
+// .zig test file here rather than this being wired up speculatively.
+const unit_test_files = [_][]const u8{};
+
+// Tier-B differential tests: behavioral-equivalence checks between a
+// pre-port C object (symbols renamed via objcopy) and its ported .zig
+// module, run over randomized inputs. Empty until a module is ported;
+// each port task wires its own differential harness here.
+const diff_test_files = [_][]const u8{};
+
+fn addTestStep(b: *std.Build, name: []const u8, desc: []const u8, files: []const []const u8, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
+    const step = b.step(name, desc);
+    for (files) |file| {
+        const test_mod = b.createModule(.{
+            .root_source_file = b.path(file),
+            .target = target,
+            .optimize = optimize,
+        });
+        const mod_test = b.addTest(.{
+            .root_module = test_mod,
+        });
+        const run_test = b.addRunArtifact(mod_test);
+        step.dependOn(&run_test.step);
+    }
 }
 
 // Same source list as taskfile.yml's SOURCES var: src/*.c + snes/*.c at
