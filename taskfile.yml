@@ -13,6 +13,7 @@ env:
 
 vars:
   TARGET_EXEC: zelda3
+  SDL2_VERSION: "2.32.10"
   CC: '{{.CC | default "cc"}}'
   CFLAGS: '{{.CFLAGS | default "-O2 -Werror"}}'
   SOURCES:
@@ -99,7 +100,20 @@ tasks:
                 sudo dnf install -y SDL2-devel
               else
                 sudo dnf install -y epel-release
-                sudo dnf install -y SDL2-devel
+                if ! sudo dnf install -y SDL2-devel; then
+                  echo "SDL2-devel unavailable via dnf/EPEL; building SDL2 {{.SDL2_VERSION}} from source"
+                  sudo dnf install -y gcc gcc-c++ make cmake git \
+                    alsa-lib-devel pulseaudio-libs-devel \
+                    libX11-devel libXext-devel libXrandr-devel libXcursor-devel \
+                    libXi-devel libXfixes-devel libXinerama-devel libXScrnSaver-devel \
+                    mesa-libGL-devel mesa-libEGL-devel \
+                    wayland-devel wayland-protocols-devel libxkbcommon-devel
+                  SRC_DIR=$(mktemp -d)
+                  git clone --branch release-{{.SDL2_VERSION}} --depth 1 https://github.com/libsdl-org/SDL.git "$SRC_DIR"
+                  ( cd "$SRC_DIR" && ./configure --prefix=/usr/local && make -j"$(nproc)" && sudo make install )
+                  sudo ldconfig
+                  rm -rf "$SRC_DIR"
+                fi
               fi
             elif command -v pacman >/dev/null 2>&1; then
               sudo pacman -S --noconfirm sdl2
