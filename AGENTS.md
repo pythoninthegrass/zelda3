@@ -43,37 +43,93 @@ watching for RAM-compare mismatches (see "RAM-compare verification" below), and 
 Some verification (e.g. exercising `LoadRef`/`ReplayRef` reference-save hotkeys, or visually confirming
 a screen) requires driving the real SDL window rather than just running the RAM-compare oracle headless.
 
-- macOS: `osascript`/System Events synthesizing key codes into the frontmost `zelda3` process, plus
+- **macOS**: `osascript`/System Events synthesizing key codes into the frontmost `zelda3` process, plus
   `screencapture -x` for screenshots. Works but is brittle (relies on the app being frontmost, numeric
   key-code mapping, and no window-manager focus quirks intervening).
-- Linux (AlmaLinux, `mf` host): headless Wayland via **sway + wtype + grim**. EL10/EPEL10 dropped the
+
+- **Linux (headless Wayland)**: headless Wayland via **sway + wtype + grim**. EL10/EPEL10 dropped the
   classic X.org server (Wayland-only), so `Xvfb`/`xdotool` are unavailable and `ydotool` (uinput) does
   *not* work — a headless `wlroots` compositor runs no libinput backend, so uinput events never reach
-  clients. The working recipe (all three built from source; `task playtest:linux` installs them):
-  1. Run `sway` headless, with a config that sizes the output and execs the game:
+  clients. All three tools can be installed from source via `task playtest:linux`.
 
-     ```sh
-     # zelda-sway.conf
-     output HEADLESS-1 resolution 1024x896
-     exec sh -c 'cd /home/lance/git/zelda3 && \
-       exec env SDL_VIDEODRIVER=wayland SDL_AUDIODRIVER=dummy ./zelda3'
-     ```
+  **Prerequisites (one-time host setup):**
+  - `seatd` service enabled and running
+  - Current user in the `input` and `seat` groups (re-login required after adding)
+  - `/dev/uinput` udev rule + `modules-load.d/uinput.conf` (kept for reference; only required for
+    `ydotool` which does not work in this environment)
 
-     ```sh
-     WLR_BACKENDS=headless WLR_RENDERER=pixman sway -c zelda-sway.conf &
-     ```
+  **Step 1 — write a sway config:**
 
-     The app must render frames — a Wayland surface is only mapped/focusable once it commits a buffer,
-     so anything that draws (zelda3 does every frame) gets keyboard focus automatically.
-  2. Inject keys with `wtype` (virtual-keyboard protocol), targeting the compositor's `WAYLAND_DISPLAY`
-     (e.g. `wayland-1`). A lone `wtype` call loses a bind race, so either send one-shot with a leading
-     sleep (`wtype -s 1000 -k Return`) or start one persistent holder (`wtype -s 600000 &`) at session
-     start and then issue instant plain `wtype`/`wtype -k <Keysym>` calls. Default keymap:
-     `Return`=Start, arrows=D-pad, `x`=A, `z`=B, `s`=X, `a`=Y, `c`=L, `v`=R.
-  3. Capture with `grim` (wlr-screencopy): `grim out.png` — the `screencapture -x` equivalent.
+  ```sh
+  REPO=$(pwd)   # must be the zelda3 repo root
+  cat > /tmp/zelda-sway.conf << 'EOF'
+  output HEADLESS-1 resolution 1024x896
+  exec sh -c 'exec env SDL_VIDEODRIVER=wayland SDL_AUDIODRIVER=dummy \
+    ${REPO}/zelda3 2>/tmp/zelda3_stderr.txt'
+  EOF
+  ```
 
-  Persistent host setup already applied on `mf`: `seatd` enabled, `lance` in `input`+`seat` groups,
-  `/dev/uinput` udev rule + `modules-load.d/uinput.conf` (only relevant to ydotool, kept for reference).
+  Replace `${REPO}` with the absolute path to the repo. The `exec sh -c` wrapper lets the game start
+  after sway has finished initialising its output. `SDL_AUDIODRIVER=dummy` suppresses audio errors on
+  headless servers.
+
+  **Step 2 — launch sway headless:**
+
+  ```sh
+  WLR_BACKENDS=headless WLR_RENDERER=pixman sway -c /tmp/zelda-sway.conf &
+  sleep 3   # wait for the Wayland socket (wayland-1) to appear
+  ```
+
+  The game starts automatically via the `exec` line in the config. A Wayland surface is only
+  mapped/focusable once it commits a frame buffer; zelda3 renders every frame so it gets keyboard
+  focus automatically.
+
+  **Step 3 — inject key events with `wtype`:**
+
+  ```sh
+  export WAYLAND_DISPLAY=wayland-1
+
+  # One-shot with a leading sleep to clear the focus-race window:
+  wtype -s 1000 -k Return          # press Start after 1 s
+
+  # Or hold the session open (avoids the per-call race) then send instant keys:
+  wtype -s 600000 &                # persistent holder
+  wtype -k Return                  # instant key to the already-focused surface
+  wtype -k F6                      # e.g. ReplayRef hotkey
+  ```
+
+  Default keymap (from `zelda3.ini`):
+  `Return`=Start, arrow keys=D-pad, `x`=A, `z`=B, `s`=X, `a`=Y, `c`=L, `v`=R.
+  Function-key hotkeys (`F5`=LoadRef, `F6`=ReplayRef) work directly via keysym name.
+
+  **Step 4 — capture a screenshot:**
+
+  ```sh
+  WAYLAND_DISPLAY=wayland-1 grim /tmp/screenshot.png
+  ```
+
+  **Step 5 — check for RAM-compare failures:**
+
+  ```sh
+  grep "Memory compare failed" /tmp/zelda3_stderr.txt | wc -l
+  # expected: 0
+  ```
+
+  **Step 6 — tear down:**
+
+  ```sh
+  kill %1   # or kill $(pgrep sway)
+  ```
+
+  **Troubleshooting:**
+  - `failed to check cache: … FileNotFound` from `zig build` — stale `.zig-cache` after a branch
+    switch that deleted files; run `rm -rf .zig-cache` then retry.
+  - `failed to create display` from sway — the user is not in the `seat` group or `seatd` is not
+    running; check `systemctl status seatd` and group membership.
+  - `wtype` key events not received — the window lost focus or the Wayland surface was not yet mapped;
+    add a longer `sleep` before injecting keys, or use the persistent-holder pattern above.
+  - EGL/Mesa warnings in stderr (`libEGL warning: failed to get driver name`) are harmless on GPU-less
+    servers; SDL falls back to software rendering automatically.
 
 ## Architecture
 
