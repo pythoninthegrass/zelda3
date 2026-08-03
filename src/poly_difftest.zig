@@ -1,5 +1,5 @@
 // Tier-B differential test for src/poly.zig: links the pre-port poly.c
-// (symbols renamed with a c_ prefix via objcopy, wired in build.zig's
+// (symbols renamed with a c_ prefix via the preprocessor (-D), wired in build.zig's
 // difftest step) against the ported Zig module and diffs their observable
 // g_ram state over fixed-seed randomized inputs.
 //
@@ -36,7 +36,7 @@ export var g_zenv: v.ZeldaEnv = .{
 };
 
 // The Zig port's exported symbols resolve against the linked poly.o (the
-// ported module), the C reference via the c_* externs (objcopy-renamed).
+// ported module), the C reference via the c_* externs (preprocessor-renamed).
 extern fn Poly_Divide(a: t.uint16, b: t.uint16) t.uint16;
 extern fn Poly_RunFrame() void;
 extern fn Polyhedral_SetShapePointer() void;
@@ -54,7 +54,7 @@ extern fn Polyhedral_FillLine() void;
 extern fn Polyhedral_SetLeft() bool;
 extern fn Polyhedral_SetRight() bool;
 
-// Pre-port C reference (poly.c), symbols renamed to c_<name> by objcopy.
+// Pre-port C reference (poly.c), symbols renamed to c_<name> by the preprocessor.
 extern fn c_Poly_Divide(a: t.uint16, b: t.uint16) t.uint16;
 extern fn c_Poly_RunFrame() void;
 extern fn c_Polyhedral_SetShapePointer() void;

@@ -1,5 +1,5 @@
 // Tier-B differential test for src/config.zig: links the pre-port config.c
-// (symbols renamed to c_* via objcopy, wired in build.zig's difftest step)
+// (symbols renamed to c_* via the preprocessor (-D), wired in build.zig's difftest step)
 // alongside the ported Zig module and diffs their behavior over randomized
 // .ini files.
 //
@@ -20,6 +20,7 @@
 // 0.16 and libc is the stable surface here.
 
 const std = @import("std");
+const builtin = @import("builtin");
 const c = @import("config.zig");
 
 const expectEqualStrings = std.testing.expectEqualStrings;
@@ -39,12 +40,25 @@ extern fn fopen(name: [*:0]const u8, mode: [*:0]const u8) ?*anyopaque;
 extern fn fclose(stream: *anyopaque) c_int;
 
 extern fn readlink(path: [*:0]const u8, buf: [*]u8, bufsiz: usize) isize;
+extern fn _NSGetExecutablePath(buf: [*]u8, bufsize: *u32) c_int; // macOS libSystem
 
-extern var stderr: *anyopaque;
+// libc's stderr FILE*: a plain `stderr` global on glibc, but macOS/BSD libc
+// has no such symbol — its `stderr` macro expands to `__stderrp`. Resolve the
+// platform-correct symbol so this harness links on both.
+inline fn stderrPtr() *anyopaque {
+    const name = if (builtin.os.tag.isDarwin()) "__stderrp" else "stderr";
+    return @extern(*(*anyopaque), .{ .name = name }).*;
+}
 
-// Zig 0.16 removed std.fs.selfExePath; /proc/self/exe is the Linux answer
-// (the difftest is Linux-only anyway, same as zig:parity-replay).
+// Zig 0.16 removed std.fs.selfExePath. /proc/self/exe is the Linux answer;
+// macOS has no procfs, so _NSGetExecutablePath fills the buffer there.
 fn selfExePath(buf: []u8) ![]const u8 {
+    if (comptime builtin.os.tag.isDarwin()) {
+        var size: u32 = @intCast(buf.len);
+        if (_NSGetExecutablePath(buf.ptr, &size) != 0)
+            return error.SelfExePathFailed;
+        return std.mem.sliceTo(buf, 0);
+    }
     const n = readlink("/proc/self/exe", buf.ptr, buf.len);
     if (n < 0) return error.SelfExePathFailed;
     return buf[0..@intCast(n)];
@@ -57,7 +71,7 @@ export fn Die(msg: [*:0]const u8) noreturn {
     @panic("Die called in difftest");
 }
 
-// The renamed C reference (config.c + util.c, c_ prefix via objcopy).
+// The renamed C reference (config.c + util.c, c_ prefix via the preprocessor).
 extern fn c_ParseConfigFile(filename: ?[*:0]const u8) void;
 extern fn c_ParseBool(value: [*:0]const u8, result: ?*bool) bool;
 extern fn c_FindCmdForSdlKey(code: c_int, mod: c_int) c_int;
@@ -100,7 +114,7 @@ fn dumpState(comptime flavor: []const u8) void {
     // stdout before this test body runs, which would poison the parent's
     // byte diff. stderr is captured separately by runWorker's popen (2>&1
     // is appended in the shell command).
-    const out = stderr;
+    const out = stderrPtr();
     _ = fprintf(out, "%s cfg=", flavor.ptr);
     for (raw) |b|
         _ = fprintf(out, "%02x", @as(c_uint, b));
@@ -157,7 +171,7 @@ test "worker dispatch (must stay first)" {
         c.ParseConfigFile(ini);
         dumpState("z");
     }
-    _ = fflush(stderr);
+    _ = fflush(stderrPtr());
     _exit(0);
 }
 

@@ -1,5 +1,5 @@
 // Tier-B differential test for src/tile_detect.zig: links the pre-port
-// tile_detect.c (symbols renamed with a c_ prefix via objcopy, wired in
+// tile_detect.c (symbols renamed with a c_ prefix via the preprocessor (-D), wired in
 // build.zig's difftest step) against the ported Zig module and diffs their
 // observable g_ram state over fixed-seed randomized inputs.
 //
@@ -56,7 +56,7 @@ export fn Ancilla_GetY(k: c_int) t.uint16 {
 }
 
 // The Zig port's exported symbols resolve against the linked tile_detect.o
-// (the ported module), the C reference via the c_* externs (objcopy-renamed).
+// (the ported module), the C reference via the c_* externs (preprocessor-renamed).
 extern fn Overworld_GetTileAttributeAtLocation(x: t.uint16, y: t.uint16) t.uint8;
 extern fn TileDetect_Movement_Y(direction: t.uint16) void;
 extern fn TileDetect_Movement_X(direction: t.uint16) void;
@@ -72,7 +72,7 @@ extern fn TileDetect_ResetState() void;
 extern fn TileDetection_Execute(x: t.uint16, y: t.uint16, bits: t.uint16) void;
 extern fn TileDetect_ExecuteInner(tile: t.uint8, offs: t.uint16, bits: t.uint16, is_indoors: bool) void;
 
-// Pre-port C reference (tile_detect.c), symbols renamed to c_<name> by objcopy.
+// Pre-port C reference (tile_detect.c), symbols renamed to c_<name> by the preprocessor.
 extern fn c_Overworld_GetTileAttributeAtLocation(x: t.uint16, y: t.uint16) t.uint8;
 extern fn c_TileDetect_Movement_Y(direction: t.uint16) void;
 extern fn c_TileDetect_Movement_X(direction: t.uint16) void;

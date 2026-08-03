@@ -1,5 +1,5 @@
 // Tier-B differential test for src/util.zig: links the pre-port util.c
-// (symbols renamed with a c_ prefix via objcopy, wired in build.zig's
+// (symbols renamed with a c_ prefix via the preprocessor (-D), wired in build.zig's
 // difftest step) against the ported Zig module and diffs their outputs over
 // randomized inputs driven by a fixed-seed PRNG. Both implementations are
 // reached via extern declarations — the original names resolve to the Zig
@@ -52,7 +52,7 @@ comptime {
     _ = u.ApplyBps;
 }
 
-// Pre-port C reference (util.c), symbols renamed to c_<name> by objcopy.
+// Pre-port C reference (util.c), symbols renamed to c_<name> by the preprocessor.
 extern fn c_NextDelim(s: *?[*:0]u8, sep: c_int) ?[*:0]u8;
 extern fn c_StringEqualsNoCase(a: [*:0]const u8, b: [*:0]const u8) bool;
 extern fn c_StringStartsWithNoCase(a: [*:0]const u8, b: [*:0]const u8) ?[*:0]const u8;
