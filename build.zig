@@ -45,6 +45,7 @@ pub fn build(b: *std.Build) void {
     exe.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "cart", "snes/cart.zig"));
     exe.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "apu", "snes/apu.zig"));
     exe.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "dma", "snes/dma.zig"));
+    exe.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "dsp", "snes/dsp.zig"));
 
     linkSdl2(b, exe_mod);
 
@@ -78,6 +79,7 @@ const unit_test_files = [_][]const u8{
     "snes/cart_test.zig",
     "snes/apu_test.zig",
     "snes/dma_test.zig",
+    "snes/dsp_test.zig",
 };
 
 // Tier-B differential tests: behavioral-equivalence checks between a
@@ -93,6 +95,7 @@ const diff_test_files = [_][]const u8{
     "snes/cart_difftest.zig",
     "snes/apu_difftest.zig",
     "snes/dma_difftest.zig",
+    "snes/dsp_difftest.zig",
 };
 
 fn addTestStep(b: *std.Build, name: []const u8, desc: []const u8, files: []const []const u8, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
@@ -258,16 +261,17 @@ fn addDiffTestStep(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
     });
 
     // apu_difftest.zig's C reference: every apu.h entry point renamed to
-    // c_<name>. apu.c's cross-module calls (spc_*/dsp_*) are NOT renamed —
-    // spc.c/dsp.c aren't ported yet, so both the C reference and the Zig
-    // port call the same real spc.o/dsp.o objects (compiled unrenamed below
-    // and shared between flavours), exercising real SPC700/DSP behavior
-    // instead of a stub.
+    // c_<name>. apu.c's cross-module calls to spc_* are NOT renamed —
+    // spc.c isn't ported yet, so both the C reference and the Zig port call
+    // the same real spc.o object (compiled unrenamed below, shared between
+    // flavours). Its dsp_* calls now resolve against the real ported
+    // dsp.zig module instead (dsp.c is ported; apu.zig/apu_c_ref both treat
+    // Dsp as opaque, so either flavour driving the real port is correct).
     const apu_ref = compileRenamedCRef(b, target, optimize, "apu_c_ref", "snes/apu.c", &.{
         "apu_init", "apu_free", "apu_reset", "apu_cycle", "apu_cpuRead", "apu_cpuWrite", "apu_saveload",
     });
     const apu_spc_obj = compileCStub(b, target, optimize, "apu_difftest_spc", "snes/spc.c");
-    const apu_dsp_obj = compileCStub(b, target, optimize, "apu_difftest_dsp", "snes/dsp.c");
+    const apu_dsp_obj = addPortedModuleAt(b, target, optimize, "apu_difftest_dsp", "snes/dsp.zig");
 
     // dma_difftest.zig's C reference: every dma.h entry point renamed to
     // c_<name>. dma.c's snes_read/snes_write/snes_readBBus/snes_writeBBus
@@ -278,6 +282,14 @@ fn addDiffTestStep(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
         "dma_init",  "dma_free",     "dma_reset",    "dma_read",
         "dma_write", "dma_doDma",    "dma_initHdma", "dma_doHdma",
         "dma_cycle", "dma_startDma", "dma_saveload",
+    });
+
+    // dsp_difftest.zig's C reference: every dsp.h entry point renamed to
+    // c_<name>. dsp.c only touches memory through the apu_ram pointer passed
+    // to dsp_init (no cross-module externs), so no stubs are needed here.
+    const dsp_ref = compileRenamedCRef(b, target, optimize, "dsp_c_ref", "snes/dsp.c", &.{
+        "dsp_init",  "dsp_free",       "dsp_reset",    "dsp_cycle", "dsp_read",
+        "dsp_write", "dsp_getSamples", "dsp_saveload",
     });
 
     for (&diff_test_files) |file| {
@@ -346,6 +358,13 @@ fn addDiffTestStep(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
             // the difftest file's own stubs, dispatched by Snes* identity.
             mod_test.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "dma", "snes/dma.zig"));
             mod_test.root_module.addObjectFile(dma_ref);
+        } else if (std.mem.eql(u8, file, "snes/dsp_difftest.zig")) {
+            // dsp.zig exports the plain symbols; the renamed dsp_c_ref
+            // carries the C reference behind c_* names. dsp.c only touches
+            // memory through the apu_ram pointer the test owns, so no bus
+            // stubs are needed.
+            mod_test.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "dsp", "snes/dsp.zig"));
+            mod_test.root_module.addObjectFile(dsp_ref);
         }
         const run_test = b.addRunArtifact(mod_test);
         step.dependOn(&run_test.step);
@@ -419,7 +438,6 @@ fn compileCStub(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.b
 // this mirrors the taskfile's `find ... ! -name ...` exclusions.
 const sources = [_][]const u8{
     "snes/cpu.c",
-    "snes/dsp.c",
     "snes/ppu.c",
     "snes/snes_other.c",
     "snes/snes.c",
