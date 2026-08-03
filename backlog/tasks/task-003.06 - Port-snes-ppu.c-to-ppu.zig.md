@@ -1,14 +1,15 @@
 ---
 id: TASK-003.06
 title: Port snes/ppu.c to ppu.zig
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-08-02 04:20'
+updated_date: '2026-08-03 00:46'
 labels: []
 dependencies:
   - TASK-003.05
 parent_task_id: TASK-003
-ordinal: 20000
+ordinal: 5000
 ---
 
 ## Description

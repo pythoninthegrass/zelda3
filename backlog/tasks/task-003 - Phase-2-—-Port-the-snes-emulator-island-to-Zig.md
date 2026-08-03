@@ -1,14 +1,15 @@
 ---
 id: TASK-003
 title: Phase 2 — Port the snes/ emulator island to Zig
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-08-02 04:18'
+updated_date: '2026-08-03 00:46'
 labels: []
 milestone: m-0
 dependencies: []
 priority: medium
-ordinal: 3000
+ordinal: 1000
 ---
 
 ## Description
