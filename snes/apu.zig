@@ -6,8 +6,9 @@
 // Apu struct layout itself stays C-owned in snes/apu.h — spc_player.c and
 // tracing.c reach through apu->ram/apu->hist/apu->spc directly — so this
 // module mirrors that layout field-for-field rather than redefining it.
-// spc.c/dsp.c are not yet ported: apu.zig calls their real spc_*/dsp_*
-// C-ABI entry points as opaque handles, exactly as apu.c did.
+// spc.zig and dsp.zig are both ported; apu.zig calls their C-ABI entry
+// points through opaque-pointer externs (Apu only ever passes the pointers
+// straight through — it never dereferences Spc/Dsp fields directly).
 
 const std = @import("std");
 
@@ -34,10 +35,9 @@ pub const HistUnion = extern union {
     padpad: ?*anyopaque,
 };
 
-// Mirrors struct Apu in snes/apu.h. spc/dsp stay opaque here: apu.c only
-// ever passes them straight through to spc_*/dsp_* calls, never dereferences
-// their fields (those structs are fully defined only in spc.h/dsp.h, owned
-// by their own not-yet-ported modules).
+// Mirrors struct Apu in snes/apu.h. spc/dsp are kept as opaque pointers
+// here: apu.zig only ever passes them straight through to spc_*/dsp_*
+// calls, never dereferences their fields.
 pub const Apu = extern struct {
     spc: ?*anyopaque,
     dsp: ?*anyopaque,
