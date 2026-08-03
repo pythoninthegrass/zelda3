@@ -43,6 +43,7 @@ pub fn build(b: *std.Build) void {
     exe.root_module.addObjectFile(addPortedModule(b, target, optimize, "tile_detect"));
     exe.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "input", "snes/input.zig"));
     exe.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "cart", "snes/cart.zig"));
+    exe.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "apu", "snes/apu.zig"));
 
     linkSdl2(b, exe_mod);
 
@@ -74,6 +75,7 @@ const unit_test_files = [_][]const u8{
     "src/tile_detect_test.zig",
     "snes/input_test.zig",
     "snes/cart_test.zig",
+    "snes/apu_test.zig",
 };
 
 // Tier-B differential tests: behavioral-equivalence checks between a
@@ -87,6 +89,7 @@ const diff_test_files = [_][]const u8{
     "src/tile_detect_difftest.zig",
     "snes/input_difftest.zig",
     "snes/cart_difftest.zig",
+    "snes/apu_difftest.zig",
 };
 
 fn addTestStep(b: *std.Build, name: []const u8, desc: []const u8, files: []const []const u8, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
@@ -238,6 +241,18 @@ fn addDiffTestStep(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
         "cart_init", "cart_free", "cart_reset", "cart_load", "cart_read", "cart_write", "cart_saveload",
     });
 
+    // apu_difftest.zig's C reference: every apu.h entry point renamed to
+    // c_<name>. apu.c's cross-module calls (spc_*/dsp_*) are NOT renamed —
+    // spc.c/dsp.c aren't ported yet, so both the C reference and the Zig
+    // port call the same real spc.o/dsp.o objects (compiled unrenamed below
+    // and shared between flavours), exercising real SPC700/DSP behavior
+    // instead of a stub.
+    const apu_ref = compileRenamedCRef(b, target, optimize, "apu_c_ref", "snes/apu.c", &.{
+        "apu_init", "apu_free", "apu_reset", "apu_cycle", "apu_cpuRead", "apu_cpuWrite", "apu_saveload",
+    });
+    const apu_spc_obj = compileCStub(b, target, optimize, "apu_difftest_spc", "snes/spc.c");
+    const apu_dsp_obj = compileCStub(b, target, optimize, "apu_difftest_dsp", "snes/dsp.c");
+
     for (&diff_test_files) |file| {
         const test_mod = b.createModule(.{
             .root_source_file = b.path(file),
@@ -288,6 +303,14 @@ fn addDiffTestStep(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
             // their mallocs, so the test frees each through its own free.
             mod_test.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "cart", "snes/cart.zig"));
             mod_test.root_module.addObjectFile(cart_ref);
+        } else if (std.mem.eql(u8, file, "snes/apu_difftest.zig")) {
+            // apu.zig exports the plain symbols; the renamed apu_c_ref
+            // carries the C reference behind c_* names. Both flavours drive
+            // the same real spc.o/dsp.o objects (unrenamed, shared).
+            mod_test.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "apu", "snes/apu.zig"));
+            mod_test.root_module.addObjectFile(apu_ref);
+            mod_test.root_module.addObjectFile(apu_spc_obj);
+            mod_test.root_module.addObjectFile(apu_dsp_obj);
         }
         const run_test = b.addRunArtifact(mod_test);
         step.dependOn(&run_test.step);
@@ -362,7 +385,6 @@ fn compileCStub(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.b
 // instance through build.zig for no benefit here — new .c files are rare and
 // this mirrors the taskfile's `find ... ! -name ...` exclusions.
 const sources = [_][]const u8{
-    "snes/apu.c",
     "snes/cpu.c",
     "snes/dma.c",
     "snes/dsp.c",
