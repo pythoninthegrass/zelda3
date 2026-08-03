@@ -46,6 +46,7 @@ pub fn build(b: *std.Build) void {
     exe.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "apu", "snes/apu.zig"));
     exe.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "dma", "snes/dma.zig"));
     exe.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "dsp", "snes/dsp.zig"));
+    exe.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "ppu", "snes/ppu.zig"));
 
     linkSdl2(b, exe_mod);
 
@@ -80,6 +81,7 @@ const unit_test_files = [_][]const u8{
     "snes/apu_test.zig",
     "snes/dma_test.zig",
     "snes/dsp_test.zig",
+    "snes/ppu_test.zig",
 };
 
 // Tier-B differential tests: behavioral-equivalence checks between a
@@ -96,6 +98,7 @@ const diff_test_files = [_][]const u8{
     "snes/apu_difftest.zig",
     "snes/dma_difftest.zig",
     "snes/dsp_difftest.zig",
+    "snes/ppu_difftest.zig",
 };
 
 fn addTestStep(b: *std.Build, name: []const u8, desc: []const u8, files: []const []const u8, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
@@ -292,6 +295,16 @@ fn addDiffTestStep(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
         "dsp_write", "dsp_getSamples", "dsp_saveload",
     });
 
+    // ppu_difftest.zig's C reference: every ppu.h entry point renamed to
+    // c_<name>. ppu.c has no cross-module externs (it only touches its own
+    // Ppu struct, passed by pointer), so no stubs are needed here.
+    const ppu_ref = compileRenamedCRef(b, target, optimize, "ppu_c_ref", "snes/ppu.c", &.{
+        "ppu_init",                         "ppu_free",             "ppu_reset",
+        "ppu_runLine",                      "ppu_read",             "ppu_write",
+        "ppu_saveload",                     "PpuBeginDrawing",      "PpuGetCurrentRenderScale",
+        "PpuSetMode7PerspectiveCorrection", "PpuSetExtraSideSpace",
+    });
+
     for (&diff_test_files) |file| {
         const test_mod = b.createModule(.{
             .root_source_file = b.path(file),
@@ -365,6 +378,12 @@ fn addDiffTestStep(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
             // stubs are needed.
             mod_test.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "dsp", "snes/dsp.zig"));
             mod_test.root_module.addObjectFile(dsp_ref);
+        } else if (std.mem.eql(u8, file, "snes/ppu_difftest.zig")) {
+            // ppu.zig exports the plain symbols; the renamed ppu_c_ref
+            // carries the C reference behind c_* names. Both flavours own
+            // their own Ppu struct (allocated via ppu_init), no shared state.
+            mod_test.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "ppu", "snes/ppu.zig"));
+            mod_test.root_module.addObjectFile(ppu_ref);
         }
         const run_test = b.addRunArtifact(mod_test);
         step.dependOn(&run_test.step);
@@ -438,7 +457,6 @@ fn compileCStub(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.b
 // this mirrors the taskfile's `find ... ! -name ...` exclusions.
 const sources = [_][]const u8{
     "snes/cpu.c",
-    "snes/ppu.c",
     "snes/snes_other.c",
     "snes/snes.c",
     "snes/spc.c",
