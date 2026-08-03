@@ -1,14 +1,15 @@
 ---
 id: TASK-003.08
 title: Port snes/snes.c to snes.zig
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-08-02 04:20'
+updated_date: '2026-08-03 00:46'
 labels: []
 dependencies:
   - TASK-003.07
 parent_task_id: TASK-003
-ordinal: 22000
+ordinal: 7000
 ---
 
 ## Description

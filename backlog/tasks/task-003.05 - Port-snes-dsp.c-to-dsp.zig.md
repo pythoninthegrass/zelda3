@@ -1,14 +1,15 @@
 ---
 id: TASK-003.05
 title: Port snes/dsp.c to dsp.zig
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-08-02 04:20'
+updated_date: '2026-08-03 00:46'
 labels: []
 dependencies:
   - TASK-003.04
 parent_task_id: TASK-003
-ordinal: 19000
+ordinal: 4000
 ---
 
 ## Description
