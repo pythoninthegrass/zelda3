@@ -39,6 +39,7 @@ Usage:
 """
 
 import argparse
+import contextlib
 import os
 import re
 import shutil
@@ -60,7 +61,7 @@ HEARTBEAT = BURN / "status" / "state.log"
 REPO = Path(config("BURN_REPO", default=str(Path.home() / "git/zelda3")))
 BRANCH = config("BURN_BRANCH", default="feat/zig-port-burn")
 SECRETS_ENV = Path(config("BURN_SECRETS_ENV", default=str(Path.home() / "git/linux_setup/.env")))
-ORCH_MODEL = config("BURN_ORCH_MODEL", default="accounts/fireworks/models/minimax-m3")
+ORCH_MODEL = config("BURN_ORCH_MODEL", default="accounts/fireworks/models/deepseek-v4-flash-0731")
 ORCH_PROVIDER = config("BURN_ORCH_PROVIDER", default="fireworks")
 FALLBACK_MODEL = config("BURN_FALLBACK_MODEL", default="Qwen3.6-27B-MTP-GGUF")
 FALLBACK_PROVIDER = config("BURN_FALLBACK_PROVIDER", default="lemonade")
@@ -257,10 +258,8 @@ def kill_task_processes(task: str) -> None:
     subprocess.run(["herdr", "pane", "close", task], check=False, capture_output=True, timeout=15)
     pidfile = BURN / "pids" / task
     if pidfile.exists():
-        try:
+        with contextlib.suppress(ProcessLookupError, ValueError, PermissionError):
             os.killpg(int(pidfile.read_text().strip()), signal.SIGKILL)
-        except (ProcessLookupError, ValueError, PermissionError):
-            pass
         pidfile.unlink(missing_ok=True)
     subprocess.run(["pkill", "-9", "-f", "hermes chat"], check=False)
     # the parity-replay gate leaves headless sway/zelda3/wtype behind on a hard kill
@@ -441,10 +440,8 @@ def cmd_kill() -> int:
     pids_dir = BURN / "pids"
     if pids_dir.exists():
         for pidfile in pids_dir.iterdir():
-            try:
+            with contextlib.suppress(ProcessLookupError, ValueError, PermissionError):
                 os.killpg(int(pidfile.read_text().strip()), signal.SIGKILL)
-            except (ProcessLookupError, ValueError, PermissionError):
-                pass
     subprocess.run(["pkill", "-9", "-f", "hermes chat"], check=False)
     subprocess.run(["pkill", "-9", "-f", "driver.py run"], check=False)
     for name in ("zelda3", "sway", "wtype"):
