@@ -44,6 +44,7 @@ pub fn build(b: *std.Build) void {
     exe.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "input", "snes/input.zig"));
     exe.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "cart", "snes/cart.zig"));
     exe.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "apu", "snes/apu.zig"));
+    exe.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "dma", "snes/dma.zig"));
 
     linkSdl2(b, exe_mod);
 
@@ -76,6 +77,7 @@ const unit_test_files = [_][]const u8{
     "snes/input_test.zig",
     "snes/cart_test.zig",
     "snes/apu_test.zig",
+    "snes/dma_test.zig",
 };
 
 // Tier-B differential tests: behavioral-equivalence checks between a
@@ -90,6 +92,7 @@ const diff_test_files = [_][]const u8{
     "snes/input_difftest.zig",
     "snes/cart_difftest.zig",
     "snes/apu_difftest.zig",
+    "snes/dma_difftest.zig",
 };
 
 fn addTestStep(b: *std.Build, name: []const u8, desc: []const u8, files: []const []const u8, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
@@ -183,11 +186,11 @@ fn addDiffTestStep(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
     const step = b.step("difftest", "Run Tier-B differential tests for ported Zig modules");
 
     const util_ref = compileRenamedCRef(b, target, optimize, "util_c_ref", "src/util.c", &.{
-        "NextDelim",           "StringEqualsNoCase",       "StringStartsWithNoCase",
-        "ReadWholeFile",       "NextLineStripComments",    "NextPossiblyQuotedString",
-        "ReplaceFilenameWithNewPath", "SplitKeyValue",     "SkipPrefix",
-        "StrSet",              "ByteArray_Resize",         "ByteArray_Destroy",
-        "ByteArray_AppendData", "ByteArray_AppendByte",    "FindIndexInMemblk",
+        "NextDelim",                  "StringEqualsNoCase",    "StringStartsWithNoCase",
+        "ReadWholeFile",              "NextLineStripComments", "NextPossiblyQuotedString",
+        "ReplaceFilenameWithNewPath", "SplitKeyValue",         "SkipPrefix",
+        "StrSet",                     "ByteArray_Resize",      "ByteArray_Destroy",
+        "ByteArray_AppendData",       "ByteArray_AppendByte",  "FindIndexInMemblk",
         "ApplyBps",
     });
 
@@ -196,29 +199,29 @@ fn addDiffTestStep(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
     // list, so they stay plain and resolve against util.zig; the c_-renamed
     // util.c copy supplies matching c_<util> definitions.
     const config_ref = compileRenamedCRef(b, target, optimize, "config_c_ref", "src/config.c", &.{
-        "ParseConfigFile",     "ParseBool",                "FindCmdForSdlKey",
-        "FindCmdForGamepadButton", "g_config",             "SDL_GetKeyFromName",
+        "ParseConfigFile",         "ParseBool", "FindCmdForSdlKey",
+        "FindCmdForGamepadButton", "g_config",  "SDL_GetKeyFromName",
     });
     const config_util_ref = compileRenamedCRef(b, target, optimize, "config_util_c_ref", "src/util.c", &.{
-        "NextDelim",           "StringEqualsNoCase",       "StringStartsWithNoCase",
-        "ReadWholeFile",       "NextLineStripComments",    "NextPossiblyQuotedString",
-        "ReplaceFilenameWithNewPath", "SplitKeyValue",     "SkipPrefix",
-        "StrSet",              "ByteArray_Resize",         "ByteArray_Destroy",
-        "ByteArray_AppendData", "ByteArray_AppendByte",    "FindIndexInMemblk",
+        "NextDelim",                  "StringEqualsNoCase",    "StringStartsWithNoCase",
+        "ReadWholeFile",              "NextLineStripComments", "NextPossiblyQuotedString",
+        "ReplaceFilenameWithNewPath", "SplitKeyValue",         "SkipPrefix",
+        "StrSet",                     "ByteArray_Resize",      "ByteArray_Destroy",
+        "ByteArray_AppendData",       "ByteArray_AppendByte",  "FindIndexInMemblk",
         "ApplyBps",
     });
 
     // poly_difftest.zig's C reference: every poly.h entry point renamed to
     // c_<name>. poly.c's only externs are g_ram/g_zenv, which the test owns.
     const poly_ref = compileRenamedCRef(b, target, optimize, "poly_c_ref", "src/poly.c", &.{
-        "Poly_Divide",                    "Poly_RunFrame",
-        "Polyhedral_SetShapePointer",     "Polyhedral_SetRotationMatrix",
-        "Polyhedral_OperateRotation",     "Polyhedral_RotatePoint",
-        "Polyhedral_ProjectPoint",        "Polyhedral_DrawPolyhedron",
-        "Polyhedral_SetForegroundColor",  "Polyhedral_CalculateCrossProduct",
-        "Polyhedral_SetColorMask",        "Polyhedral_EmptyBitMapBuffer",
-        "Polyhedral_DrawFace",            "Polyhedral_FillLine",
-        "Polyhedral_SetLeft",             "Polyhedral_SetRight",
+        "Poly_Divide",                   "Poly_RunFrame",
+        "Polyhedral_SetShapePointer",    "Polyhedral_SetRotationMatrix",
+        "Polyhedral_OperateRotation",    "Polyhedral_RotatePoint",
+        "Polyhedral_ProjectPoint",       "Polyhedral_DrawPolyhedron",
+        "Polyhedral_SetForegroundColor", "Polyhedral_CalculateCrossProduct",
+        "Polyhedral_SetColorMask",       "Polyhedral_EmptyBitMapBuffer",
+        "Polyhedral_DrawFace",           "Polyhedral_FillLine",
+        "Polyhedral_SetLeft",            "Polyhedral_SetRight",
     });
 
     // tile_detect_difftest.zig's C reference: every tile_detect.h entry point
@@ -265,6 +268,17 @@ fn addDiffTestStep(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
     });
     const apu_spc_obj = compileCStub(b, target, optimize, "apu_difftest_spc", "snes/spc.c");
     const apu_dsp_obj = compileCStub(b, target, optimize, "apu_difftest_dsp", "snes/dsp.c");
+
+    // dma_difftest.zig's C reference: every dma.h entry point renamed to
+    // c_<name>. dma.c's snes_read/snes_write/snes_readBBus/snes_writeBBus
+    // externs are NOT renamed — snes.c isn't ported yet, so both flavours
+    // get them from the difftest file's own export fn stubs (pointer-identity
+    // dispatched per flavour), rather than a real snes.o.
+    const dma_ref = compileRenamedCRef(b, target, optimize, "dma_c_ref", "snes/dma.c", &.{
+        "dma_init",  "dma_free",     "dma_reset",    "dma_read",
+        "dma_write", "dma_doDma",    "dma_initHdma", "dma_doHdma",
+        "dma_cycle", "dma_startDma", "dma_saveload",
+    });
 
     for (&diff_test_files) |file| {
         const test_mod = b.createModule(.{
@@ -325,6 +339,13 @@ fn addDiffTestStep(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
             mod_test.root_module.addObjectFile(apu_ref);
             mod_test.root_module.addObjectFile(apu_spc_obj);
             mod_test.root_module.addObjectFile(apu_dsp_obj);
+        } else if (std.mem.eql(u8, file, "snes/dma_difftest.zig")) {
+            // dma.zig exports the plain symbols; the renamed dma_c_ref
+            // carries the C reference behind c_* names. Both flavours get
+            // their snes_read/snes_write/snes_readBBus/snes_writeBBus from
+            // the difftest file's own stubs, dispatched by Snes* identity.
+            mod_test.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "dma", "snes/dma.zig"));
+            mod_test.root_module.addObjectFile(dma_ref);
         }
         const run_test = b.addRunArtifact(mod_test);
         step.dependOn(&run_test.step);
@@ -398,7 +419,6 @@ fn compileCStub(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.b
 // this mirrors the taskfile's `find ... ! -name ...` exclusions.
 const sources = [_][]const u8{
     "snes/cpu.c",
-    "snes/dma.c",
     "snes/dsp.c",
     "snes/ppu.c",
     "snes/snes_other.c",
