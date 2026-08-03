@@ -46,6 +46,7 @@ pub fn build(b: *std.Build) void {
     exe.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "apu", "snes/apu.zig"));
     exe.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "dma", "snes/dma.zig"));
     exe.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "dsp", "snes/dsp.zig"));
+    exe.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "spc", "snes/spc.zig"));
     exe.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "ppu", "snes/ppu.zig"));
 
     linkSdl2(b, exe_mod);
@@ -81,6 +82,7 @@ const unit_test_files = [_][]const u8{
     "snes/apu_test.zig",
     "snes/dma_test.zig",
     "snes/dsp_test.zig",
+    "snes/spc_test.zig",
     "snes/ppu_test.zig",
 };
 
@@ -98,6 +100,7 @@ const diff_test_files = [_][]const u8{
     "snes/apu_difftest.zig",
     "snes/dma_difftest.zig",
     "snes/dsp_difftest.zig",
+    "snes/spc_difftest.zig",
     "snes/ppu_difftest.zig",
 };
 
@@ -273,7 +276,7 @@ fn addDiffTestStep(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
     const apu_ref = compileRenamedCRef(b, target, optimize, "apu_c_ref", "snes/apu.c", &.{
         "apu_init", "apu_free", "apu_reset", "apu_cycle", "apu_cpuRead", "apu_cpuWrite", "apu_saveload",
     });
-    const apu_spc_obj = compileCStub(b, target, optimize, "apu_difftest_spc", "snes/spc.c");
+    const apu_spc_obj = addPortedModuleAt(b, target, optimize, "apu_difftest_spc", "snes/spc.zig");
     const apu_dsp_obj = addPortedModuleAt(b, target, optimize, "apu_difftest_dsp", "snes/dsp.zig");
 
     // dma_difftest.zig's C reference: every dma.h entry point renamed to
@@ -293,6 +296,14 @@ fn addDiffTestStep(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
     const dsp_ref = compileRenamedCRef(b, target, optimize, "dsp_c_ref", "snes/dsp.c", &.{
         "dsp_init",  "dsp_free",       "dsp_reset",    "dsp_cycle", "dsp_read",
         "dsp_write", "dsp_getSamples", "dsp_saveload",
+    });
+
+    // spc_difftest.zig's C reference: every spc.h entry point renamed to
+    // c_<name>. spc.c's cross-module calls to apu_cpuRead/apu_cpuWrite are
+    // NOT renamed — the difftest file exports those stubs itself (shared
+    // between both flavours), so no separate bus stub is needed.
+    const spc_ref = compileRenamedCRef(b, target, optimize, "spc_c_ref", "snes/spc.c", &.{
+        "spc_init", "spc_free", "spc_reset", "spc_runOpcode", "spc_saveload",
     });
 
     // ppu_difftest.zig's C reference: every ppu.h entry point renamed to
@@ -378,6 +389,13 @@ fn addDiffTestStep(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
             // stubs are needed.
             mod_test.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "dsp", "snes/dsp.zig"));
             mod_test.root_module.addObjectFile(dsp_ref);
+        } else if (std.mem.eql(u8, file, "snes/spc_difftest.zig")) {
+            // spc.zig exports the plain symbols; the renamed spc_c_ref
+            // carries the C reference behind c_* names. Both flavours share
+            // the difftest's own apu_cpuRead/apu_cpuWrite stubs (no separate
+            // bus object needed).
+            mod_test.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "spc", "snes/spc.zig"));
+            mod_test.root_module.addObjectFile(spc_ref);
         } else if (std.mem.eql(u8, file, "snes/ppu_difftest.zig")) {
             // ppu.zig exports the plain symbols; the renamed ppu_c_ref
             // carries the C reference behind c_* names. Both flavours own
@@ -459,7 +477,6 @@ const sources = [_][]const u8{
     "snes/cpu.c",
     "snes/snes_other.c",
     "snes/snes.c",
-    "snes/spc.c",
     "snes/tracing.c",
     "src/ancilla.c",
     "src/attract.c",
