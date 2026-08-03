@@ -1,0 +1,44 @@
+fail_fast: true
+
+repos:
+  - repo: local
+    hooks:
+      - id: zig-fmt
+        name: zig fmt
+        entry: zig fmt
+        language: system
+        types: [file]
+        files: \.zig$
+      - id: ruff-format
+        name: ruff format
+        entry: ruff format
+        language: system
+        types: [python]
+      - id: ruff-check
+        name: ruff check
+        entry: ruff check --fix
+        language: system
+        types: [python]
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+        args: ['--maxkb=1024']
+      - id: check-executables-have-shebangs
+        files: \.(sh)$
+      - id: check-merge-conflict
+      - id: check-shebang-scripts-are-executable
+        files: \.(sh)$
+      - id: check-symlinks
+      - id: destroyed-symlinks
+      - id: detect-private-key
+      - id: end-of-file-fixer
+        files: \.(zig|c|h|sh|py)$
+      - id: fix-byte-order-marker
+      - id: mixed-line-ending
+        files: \.(zig|c|h|sh|py)$
+      - id: check-toml
+        files: \.toml$
+      - id: check-yaml
+        args: [--unsafe]
+        files: \.(yaml|yml)$
