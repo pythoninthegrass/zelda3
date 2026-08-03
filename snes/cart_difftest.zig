@@ -1,5 +1,5 @@
 // Tier-B differential test for snes/cart.zig: links the pre-port snes/cart.c
-// (symbols renamed with a c_ prefix via objcopy, wired in build.zig's
+// (symbols renamed with a c_ prefix via the preprocessor (-D), wired in build.zig's
 // difftest step) against the ported Zig module and diffs their observable
 // state over fixed-seed randomized read/write streams.
 //
@@ -30,7 +30,7 @@ pub const Cart = extern struct {
 };
 
 // The Zig port's exported symbols resolve against the linked cart.o (the
-// ported module); the C reference via the c_* externs (objcopy-renamed).
+// ported module); the C reference via the c_* externs (preprocessor-renamed).
 extern fn cart_init(snes: ?*anyopaque) ?*Cart;
 extern fn cart_free(cart: ?*Cart) void;
 extern fn cart_reset(cart: *Cart) void;

@@ -14,6 +14,7 @@
 // reached via an extern declared in the harnesses that link this module.
 
 const std = @import("std");
+const builtin = @import("builtin");
 const t = @import("types.zig");
 
 extern fn Die(msg: [*:0]const u8) noreturn;
@@ -22,7 +23,14 @@ extern fn realloc(ptr: ?*anyopaque, size: usize) ?*anyopaque;
 extern fn free(ptr: ?*anyopaque) void;
 
 extern fn fprintf(stream: *anyopaque, fmt: [*:0]const u8, ...) c_int;
-extern var stderr: *anyopaque;
+
+// libc's stderr FILE*. glibc exports a plain `stderr` global, but macOS/BSD
+// libc has no such symbol — its `stderr` macro expands to `__stderrp`. Resolve
+// the platform-correct symbol so this object links on both.
+inline fn stderrPtr() *anyopaque {
+    const name = if (builtin.os.tag.isDarwin()) "__stderrp" else "stderr";
+    return @extern(*(*anyopaque), .{ .name = name }).*;
+}
 
 // util.zig owns these; plain externs so this object links standalone in the
 // test harnesses as well as next to util.o in the exe.
@@ -378,11 +386,11 @@ fn ParseKeyArray(value: [*:0]u8, cmd_in: c_int, size: c_int) void {
         }
         const key = SDL_GetKeyFromName(p);
         if (key == SDLK_UNKNOWN) {
-            _ = fprintf(stderr, "Unknown key: '%s'\n", p);
+            _ = fprintf(stderrPtr(), "Unknown key: '%s'\n", p);
             continue;
         }
         if (!KeyMapHash_Add(key_with_mod | remapSdlKeycode(key), @intCast(cmd)))
-            _ = fprintf(stderr, "Duplicate key: '%s'\n", p);
+            _ = fprintf(stderrPtr(), "Duplicate key: '%s'\n", p);
     }
 }
 
@@ -479,7 +487,7 @@ fn ParseGamepadArray(value: [*:0]u8, cmd_in: c_int, size: c_int) void {
         while (true) {
             const button = ParseGamepadButtonName(&ss);
             if (button == kGamepadBtn_Invalid) {
-                _ = fprintf(stderr, "Unknown gamepad button: '%s'\n", s);
+                _ = fprintf(stderrPtr(), "Unknown gamepad button: '%s'\n", s);
                 break;
             }
             while (ss[0] == ' ' or ss[0] == '\t') ss += 1;
@@ -490,7 +498,7 @@ fn ParseGamepadArray(value: [*:0]u8, cmd_in: c_int, size: c_int) void {
                 GamepadMap_Add(@intCast(button), modifiers, @intCast(cmd));
                 break;
             } else {
-                _ = fprintf(stderr, "Unknown gamepad button: '%s'\n", s);
+                _ = fprintf(stderrPtr(), "Unknown gamepad button: '%s'\n", s);
                 break;
             }
         }
@@ -785,22 +793,22 @@ fn ParseOneConfigFile(filename: [*:0]const u8, depth: c_int) bool {
         if (p[0] == '[') {
             section = GetIniSection(p);
             if (section < 0)
-                _ = fprintf(stderr, "%s:%d: Invalid .ini section %s\n", filename, lineno, p);
+                _ = fprintf(stderrPtr(), "%s:%d: Invalid .ini section %s\n", filename, lineno, p);
         } else if (p[0] == '!' and SkipPrefix(p + 1, "include ") != null) {
             var tt: ?[*:0]u8 = p + 8;
             const new_filename = ReplaceFilenameWithNewPath(filename, NextPossiblyQuotedString(&tt).?);
             if (depth > 10 or !ParseOneConfigFile(new_filename.?, depth + 1))
-                _ = fprintf(stderr, "Warning: Unable to read %s\n", new_filename.?);
+                _ = fprintf(stderrPtr(), "Warning: Unable to read %s\n", new_filename.?);
             free(new_filename);
         } else if (section == -2) {
-            _ = fprintf(stderr, "%s:%d: Expecting [section]\n", filename, lineno);
+            _ = fprintf(stderrPtr(), "%s:%d: Expecting [section]\n", filename, lineno);
         } else {
             const v = SplitKeyValue(p) orelse {
-                _ = fprintf(stderr, "%s:%d: Expecting 'key=value'\n", filename, lineno);
+                _ = fprintf(stderrPtr(), "%s:%d: Expecting 'key=value'\n", filename, lineno);
                 continue;
             };
             if (section >= 0 and !HandleIniConfig(section, p, v))
-                _ = fprintf(stderr, "%s:%d: Can't parse '%s'\n", filename, lineno, p);
+                _ = fprintf(stderrPtr(), "%s:%d: Can't parse '%s'\n", filename, lineno, p);
         }
     }
     return true;
@@ -812,7 +820,7 @@ pub export fn ParseConfigFile(filename: ?[*:0]const u8) void {
     if (filename != null or !ParseOneConfigFile("zelda3.user.ini", 0)) {
         const fname = filename orelse "zelda3.ini";
         if (!ParseOneConfigFile(fname, 0))
-            _ = fprintf(stderr, "Warning: Unable to read config file %s\n", fname);
+            _ = fprintf(stderrPtr(), "Warning: Unable to read config file %s\n", fname);
     }
     RegisterDefaultKeys();
 }

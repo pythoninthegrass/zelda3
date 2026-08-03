@@ -79,7 +79,7 @@ const unit_test_files = [_][]const u8{
 };
 
 // Tier-B differential tests: behavioral-equivalence checks between a
-// pre-port C object (symbols renamed via objcopy) and its ported .zig
+// pre-port C object (symbols renamed via the preprocessor) and its ported .zig
 // module, run over randomized inputs. Empty until a module is ported;
 // each port task wires its own differential harness here.
 const diff_test_files = [_][]const u8{
@@ -144,6 +144,10 @@ fn addPortedModuleAt(b: *std.Build, target: std.Build.ResolvedTarget, optimize: 
 // drags in all of SDL), so the test harnesses compile this 20-line table
 // from the real key names instead of linking SDL just for lookups.
 fn addSdlKeyStub(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) std.Build.LazyPath {
+    return sdlKeyStubObj(b, target, optimize, false);
+}
+
+fn sdlKeyStubObj(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, renamed: bool) std.Build.LazyPath {
     const mod = b.createModule(.{
         .target = target,
         .optimize = optimize,
@@ -155,16 +159,23 @@ fn addSdlKeyStub(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.
         if (std.mem.startsWith(u8, flag, "-I"))
             mod.addIncludePath(.{ .cwd_relative = flag[2..] });
     }
-    mod.addCSourceFile(.{ .file = b.path("other/sdl_keyname_stub.c") });
+    // The renamed flavour renames its SDL_GetKeyFromName definition to
+    // c_SDL_GetKeyFromName at the preprocessor level (see compileRenamedCRef),
+    // matching config_c_ref's renamed reference to it.
+    const src_flags: []const []const u8 = if (renamed)
+        &.{"-DSDL_GetKeyFromName=c_SDL_GetKeyFromName"}
+    else
+        &.{};
+    mod.addCSourceFile(.{ .file = b.path("other/sdl_keyname_stub.c"), .flags = src_flags });
     const obj = b.addObject(.{
-        .name = "sdl_keyname_stub",
+        .name = if (renamed) "sdl_keyname_stub_renamed" else "sdl_keyname_stub",
         .root_module = mod,
     });
     return obj.getEmittedBin();
 }
 
 // Tier-B differential tests link a pre-port C object (symbols renamed with a
-// c_ prefix via objcopy) against the ported .zig module, so the test can call
+// c_ prefix via the preprocessor) against the ported .zig module, so the test can call
 // both and diff their outputs over randomized inputs. Each ported module that
 // has a pre-port C reference wires its own (test file, C source, rename list)
 // entry here.
@@ -180,9 +191,10 @@ fn addDiffTestStep(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
         "ApplyBps",
     });
 
-    // config_difftest.zig's C-reference flavour: config.c plus a renamed
-    // util.c (it shares the util helpers; the rename list must cover both,
-    // since objcopy only renames definitions, not references).
+    // config_difftest.zig's C-reference flavour: config.c plus a separately
+    // renamed util.c copy. config.c's util references aren't in its own rename
+    // list, so they stay plain and resolve against util.zig; the c_-renamed
+    // util.c copy supplies matching c_<util> definitions.
     const config_ref = compileRenamedCRef(b, target, optimize, "config_c_ref", "src/config.c", &.{
         "ParseConfigFile",     "ParseBool",                "FindCmdForSdlKey",
         "FindCmdForGamepadButton", "g_config",             "SDL_GetKeyFromName",
@@ -210,9 +222,10 @@ fn addDiffTestStep(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
     });
 
     // tile_detect_difftest.zig's C reference: every tile_detect.h entry point
-    // renamed to c_<name>, plus its cross-module externs (objcopy renames
-    // references too) resolved by the per-module stubs in
-    // other/tile_detect_difftest_stubs/. g_ram/g_zenv are the test's own.
+    // renamed to c_<name>, plus its cross-module externs (also in the rename
+    // list, so tile_detect.c's references to them become c_<name> too) resolved
+    // by the per-module stubs in other/tile_detect_difftest_stubs/, which define
+    // those c_ names directly. g_ram/g_zenv are the test's own.
     const tile_detect_ref = compileRenamedCRef(b, target, optimize, "tile_detect_c_ref", "src/tile_detect.c", &.{
         "Overworld_GetTileAttributeAtLocation", "TileDetect_Movement_Y",
         "TileDetect_Movement_X",                "TileDetect_Movement_VerticalSlopes",
@@ -228,15 +241,15 @@ fn addDiffTestStep(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
     const tile_detect_overworld_stub = compileCStub(b, target, optimize, "tile_detect_overworld_stub", "other/tile_detect_difftest_stubs/overworld_stub.c");
 
     // input_difftest.zig's C reference: every input.h entry point renamed to
-    // c_<name>. input_free renames cleanly too — its libc free call is a
-    // reference, and objcopy only renames definitions.
+    // c_<name>. input_free renames cleanly too — only its own name is in the
+    // rename list, so its libc free() call is left untouched.
     const input_ref = compileRenamedCRef(b, target, optimize, "input_c_ref", "snes/input.c", &.{
         "input_init", "input_free", "input_reset", "input_cycle", "input_read",
     });
 
     // cart_difftest.zig's C reference: every cart.h entry point renamed to
     // c_<name>. cart.c's only externs are libc (malloc/free/memcpy/memset),
-    // which objcopy leaves alone (they are references, not definitions).
+    // which the rename list omits, so they stay unrenamed.
     const cart_ref = compileRenamedCRef(b, target, optimize, "cart_c_ref", "snes/cart.c", &.{
         "cart_init", "cart_free", "cart_reset", "cart_load", "cart_read", "cart_write", "cart_saveload",
     });
@@ -267,10 +280,11 @@ fn addDiffTestStep(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
             mod_test.root_module.addObjectFile(util_ref);
         } else if (std.mem.eql(u8, file, "src/config_difftest.zig")) {
             // The parent re-execs itself per randomized ini (fresh keymap
-            // state each run); config.zig's plain util externs resolve
-            // against util.o here, and config_c_ref's renamed c_util_* calls
-            // resolve against config_util_c_ref (objcopy renames definitions
-            // but not references, so the C side needs its own c_ util copy).
+            // state each run); config.zig's plain util externs resolve against
+            // util.o here. config_c_ref's own util references stay plain (not
+            // in its rename list) and also resolve against util.o; the c_-
+            // renamed config_util_c_ref copy carries the matching c_util_*
+            // definitions.
             mod_test.root_module.addObjectFile(addPortedModule(b, target, optimize, "util"));
             mod_test.root_module.addObjectFile(config_ref);
             mod_test.root_module.addObjectFile(config_util_ref);
@@ -317,21 +331,22 @@ fn addDiffTestStep(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
     }
 }
 
-// The config_c_ref object calls SDL_GetKeyFromName; under objcopy that
-// reference is renamed too (it's in the rename list), so the C flavour needs
-// a c_SDL_GetKeyFromName definition — the same key table, symbol renamed.
+// config_c_ref renames its SDL_GetKeyFromName reference to c_SDL_GetKeyFromName,
+// so the C flavour needs a c_SDL_GetKeyFromName definition — the same key table,
+// symbol renamed at compile time.
 fn addRenamedSdlKeyStub(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) std.Build.LazyPath {
-    const stub = addSdlKeyStub(b, target, optimize);
-    const objcopy = b.addSystemCommand(&.{"objcopy"});
-    objcopy.addArgs(&.{ "--redefine-sym", "SDL_GetKeyFromName=c_SDL_GetKeyFromName" });
-    objcopy.addFileArg(stub);
-    return objcopy.addOutputFileArg("sdl_keyname_stub_renamed.o");
+    return sdlKeyStubObj(b, target, optimize, true);
 }
 
-// Compile a pre-port C source to an object, then rename each exported symbol
-// to c_<name> via objcopy so it links alongside the ported Zig module (which
-// owns the original names) without colliding. Returns the renamed object as a
-// LazyPath for mod_test.addObjectFile.
+// Compile a pre-port C source to an object with each exported symbol renamed
+// to c_<name> so it links alongside the ported Zig module (which owns the
+// original names) without colliding. The rename is done at the preprocessor
+// level (`-D<sym>=c_<sym>`) rather than post-hoc with objcopy: the preprocessor
+// rewrites every token occurrence in the TU (the definition and any same-TU
+// references), which matches objcopy's symbol-table rewrite (definitions plus
+// undefined cross-TU references) and, unlike objcopy, needs no external tool
+// and works identically on ELF and Mach-O (whose leading-underscore symbol
+// names silently defeated the bare-name objcopy invocation on macOS).
 fn compileRenamedCRef(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, name: []const u8, src: []const u8, syms: []const []const u8) std.Build.LazyPath {
     const ref_mod = b.createModule(.{
         .target = target,
@@ -346,18 +361,15 @@ fn compileRenamedCRef(b: *std.Build, target: std.Build.ResolvedTarget, optimize:
         if (std.mem.startsWith(u8, flag, "-I"))
             ref_mod.addIncludePath(.{ .cwd_relative = flag[2..] });
     }
-    ref_mod.addCSourceFile(.{ .file = b.path(src) });
+    const dflags = b.allocator.alloc([]const u8, syms.len) catch @panic("OOM");
+    for (syms, 0..) |sym, i|
+        dflags[i] = b.fmt("-D{s}=c_{s}", .{ sym, sym });
+    ref_mod.addCSourceFile(.{ .file = b.path(src), .flags = dflags });
     const ref_obj = b.addObject(.{
         .name = name,
         .root_module = ref_mod,
     });
-
-    const objcopy = b.addSystemCommand(&.{"objcopy"});
-    for (syms) |sym| {
-        objcopy.addArgs(&.{ "--redefine-sym", b.fmt("{s}=c_{s}", .{ sym, sym }) });
-    }
-    objcopy.addFileArg(ref_obj.getEmittedBin());
-    return objcopy.addOutputFileArg(b.fmt("{s}_renamed.o", .{name}));
+    return ref_obj.getEmittedBin();
 }
 
 // Compile a difftest-side C stub (a per-module shim satisfying a renamed C

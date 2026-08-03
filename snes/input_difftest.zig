@@ -1,5 +1,5 @@
 // Tier-B differential test for snes/input.zig: links the pre-port snes/input.c
-// (symbols renamed with a c_ prefix via objcopy, wired in build.zig's
+// (symbols renamed with a c_ prefix via the preprocessor (-D), wired in build.zig's
 // difftest step) against the ported Zig module and diffs their observable
 // state over fixed-seed randomized input streams.
 //
@@ -26,7 +26,7 @@ pub const Input = extern struct {
 };
 
 // The Zig port's exported symbols resolve against the linked input.o (the
-// ported module); the C reference via the c_* externs (objcopy-renamed).
+// ported module); the C reference via the c_* externs (preprocessor-renamed).
 extern fn input_init(snes: ?*anyopaque) ?*Input;
 extern fn input_free(input: ?*Input) void;
 extern fn input_reset(input: *Input) void;

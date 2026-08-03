@@ -1,5 +1,5 @@
 // Tier-B differential test for snes/apu.zig: links the pre-port snes/apu.c
-// (symbols renamed with a c_ prefix via objcopy, wired in build.zig's
+// (symbols renamed with a c_ prefix via the preprocessor (-D), wired in build.zig's
 // difftest step) against the ported Zig module and diffs their observable
 // state over fixed-seed randomized read/write/cycle streams.
 //
@@ -155,23 +155,42 @@ test "diff randomized cpuRead/cpuWrite/cycle streams" {
     try expectApusEqual(c, z);
 }
 
-var seen_c: Seen = .{};
-var seen_z: Seen = .{};
-const Seen = struct { data: ?*anyopaque = null, size: usize = 0 };
+// apu_saveload invokes func once per contiguous save region: apu->ram first,
+// then dsp_saveload and spc_saveload each hand their own region (in dsp, then
+// spc order). Record the whole sequence so the test can verify the C and Zig
+// flavours serialize the same regions, in the same order, with the same sizes.
+// Only the first region (apu->ram) has an address we can check against a known
+// field; dsp/spc regions live in separately-allocated objects whose addresses
+// legitimately differ per instance, so those are compared by size, not pointer.
+const MaxRegions = 8;
+const Recorder = struct {
+    sizes: [MaxRegions]usize = undefined,
+    first: ?*anyopaque = null,
+    n: usize = 0,
+
+    fn record(self: *Recorder, data: ?*anyopaque, size: usize) void {
+        if (self.n == 0) self.first = data;
+        if (self.n < MaxRegions) self.sizes[self.n] = size;
+        self.n += 1;
+    }
+};
+
+var rec_c: Recorder = .{};
+var rec_z: Recorder = .{};
 
 fn saveloadCbC(ctx: ?*anyopaque, data: ?*anyopaque, data_size: usize) callconv(.c) void {
     _ = ctx;
-    seen_c = .{ .data = data, .size = data_size };
+    rec_c.record(data, data_size);
 }
 
 fn saveloadCbZ(ctx: ?*anyopaque, data: ?*anyopaque, data_size: usize) callconv(.c) void {
     _ = ctx;
-    seen_z = .{ .data = data, .size = data_size };
+    rec_z.record(data, data_size);
 }
 
-test "diff saveload hands the same ram slice size" {
-    seen_c = .{};
-    seen_z = .{};
+test "diff saveload hands the same regions in the same order" {
+    rec_c = .{};
+    rec_z = .{};
     const c = c_apu_init() orelse return error.OutOfMemory;
     defer c_apu_free(c);
     const z = apu_init() orelse return error.OutOfMemory;
@@ -181,7 +200,13 @@ test "diff saveload hands the same ram slice size" {
 
     c_apu_saveload(c, saveloadCbC, null);
     apu_saveload(z, saveloadCbZ, null);
-    try expectEqual(@as(?*anyopaque, @ptrCast(&c.ram)), seen_c.data);
-    try expectEqual(@as(?*anyopaque, @ptrCast(&z.ram)), seen_z.data);
-    try expectEqual(seen_c.size, seen_z.size);
+
+    // The first region handed to the callback is apu->ram (before dsp/spc).
+    try expectEqual(@as(?*anyopaque, @ptrCast(&c.ram)), rec_c.first);
+    try expectEqual(@as(?*anyopaque, @ptrCast(&z.ram)), rec_z.first);
+    // Both flavours must serialize the same number of regions...
+    try expect(rec_c.n <= MaxRegions);
+    try expectEqual(rec_c.n, rec_z.n);
+    // ...with identical region sizes in identical order.
+    try expectEqualSlices(usize, rec_c.sizes[0..rec_c.n], rec_z.sizes[0..rec_z.n]);
 }
