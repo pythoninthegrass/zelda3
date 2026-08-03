@@ -20,8 +20,9 @@ CLAUDE.md
 /zelda3
 /zelda3.res
 /src/*.o
+/*.o
 /*.exe
-/*.out
+/.out
 /snes/*.o
 /.task/
 /msu/
