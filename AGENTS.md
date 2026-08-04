@@ -176,6 +176,31 @@ in `g_wanted_zelda_features` / `kFeatures0_*`, toggled via `zelda3.ini`. Bug fix
 behavior are gated similarly (`kBugFix_*`) so default behavior can still match the original ROM exactly
 when needed for RAM comparison.
 
+### Checking Fireworks usage/cost
+
+`scripts/burn/driver.py` (the overnight backlog-burn driver on `mf`) runs its orchestrator through
+Fireworks (`FIREWORKS_API_KEY` in `~/git/linux_setup/.env` on `mf`). There's no `firectl` installed there,
+so check usage via the HTTP API directly:
+
+```sh
+export FIREWORKS_API_KEY=$(grep -m1 FIREWORKS_API_KEY ~/git/linux_setup/.env | cut -d= -f2-)
+
+# account id isn't stored anywhere — list accounts once to find it (a wildcard `-` 404s)
+curl -s 'https://api.fireworks.ai/v1/accounts' -H "Authorization: Bearer $FIREWORKS_API_KEY"
+# -> "name": "accounts/pythoninthegrass"
+
+curl -sG 'https://api.fireworks.ai/v1/accounts/pythoninthegrass/billingUsage' \
+  -H "Authorization: Bearer $FIREWORKS_API_KEY" \
+  --data-urlencode 'startTime=2026-08-04T00:00:00Z' \
+  --data-urlencode 'endTime=2026-08-05T00:00:00Z' \
+  --data-urlencode 'usageType=SERVERLESS' \
+  --data-urlencode 'groupBy=model_name'
+```
+
+Returns `promptTokens`/`cachedPromptTokens`/`completionTokens`/`costNanoUsd` grouped by model.
+`costNanoUsd` lags behind the token counts (can read `0` for the current day even with real usage) —
+re-query after the aggregation catches up (next day) for an accurate cost, don't trust a same-day `0`.
+
 ## Context7
 
 Always use Context7 MCP when I need library/API documentation, code generation, setup or configuration steps without me having to explicitly ask.
