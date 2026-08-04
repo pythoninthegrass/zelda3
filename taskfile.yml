@@ -162,6 +162,11 @@ tasks:
         $(sdl2-config --cflags) -DSYSTEM_VOLUME_MIXER_AVAILABLE=0
         {{.SRC}} -o {{trimSuffix ".c" .SRC}}.o
 
+  prek:
+    desc: Run prek (pre-commit) hooks against the full tree
+    cmds:
+      - prek run --all-files
+
   install:
     desc: Install SDL2 for the current OS
     cmds:
