@@ -9,6 +9,13 @@ repos:
         language: system
         types: [file]
         files: \.zig$
+      - id: zig-build
+        name: zig build
+        entry: zig build
+        language: system
+        types: [file]
+        files: \.zig$
+        pass_filenames: false
       - id: ruff-format
         name: ruff format
         entry: ruff format
