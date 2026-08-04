@@ -94,7 +94,9 @@ def heartbeat(task: str, attempt: int, phase: str, status: str) -> None:
         f.write(f"{now()} task={task} attempt={attempt} phase={phase} status={status}\n")
 
 
-def sh(*args: str, cwd: Path | None = None, check: bool = True, timeout: int = 300, env: dict | None = None) -> subprocess.CompletedProcess:
+def sh(
+    *args: str, cwd: Path | None = None, check: bool = True, timeout: int = 300, env: dict | None = None
+) -> subprocess.CompletedProcess:
     return subprocess.run(args, cwd=cwd, check=check, timeout=timeout, env=env, capture_output=True, text=True)
 
 
@@ -239,12 +241,20 @@ HERMES_CMD = (
 def launch_hermes(task: str, wt: Path, prompt_file: Path, log: Path, env: dict) -> None:
     model, provider = orch()
     task_env = {
-        "BURN_PROMPT": str(prompt_file), "BURN_LOG": str(log),
-        "BURN_MODEL": model, "BURN_PROVIDER": provider, "BURN_MAX_TURNS": str(MAX_TURNS),
+        "BURN_PROMPT": str(prompt_file),
+        "BURN_LOG": str(log),
+        "BURN_MODEL": model,
+        "BURN_PROVIDER": provider,
+        "BURN_MAX_TURNS": str(MAX_TURNS),
     }
     if herdr_available():
         cmd = ["herdr", "agent", "start", task, "--cwd", str(wt), "--no-focus"]
-        for k, v in {**task_env, "FIREWORKS_API_KEY": env.get("FIREWORKS_API_KEY", ""), "LEMONADE_API_KEY": env.get("LEMONADE_API_KEY", ""), "PATH": env["PATH"]}.items():
+        for k, v in {
+            **task_env,
+            "FIREWORKS_API_KEY": env.get("FIREWORKS_API_KEY", ""),
+            "LEMONADE_API_KEY": env.get("LEMONADE_API_KEY", ""),
+            "PATH": env["PATH"],
+        }.items():
             cmd += ["--env", f"{k}={v}"]
         cmd += ["--", "bash", "-c", HERMES_CMD]
         if subprocess.run(cmd, check=False, timeout=60).returncode == 0:
@@ -290,6 +300,7 @@ class Verdict:
 
 
 GATES = [
+    ("prek", 180),  # lint + correctness checks (pre-commit hooks) over the whole tree
     ("zig:build", 300),
     ("zig:test", 120),
     ("zig:difftest", 120),
@@ -342,9 +353,11 @@ def ensure_backlog_done(task: str, wt: Path) -> None:
     backlog("task", "edit", task, "-s", "Done", cwd=wt, check=False)
     git("add", TASKS_DIR, cwd=wt, check=False)
     git(
-        "commit", "-m",
+        "commit",
+        "-m",
         f"chore(backlog): force-mark {task} done (gates green, worker turn-capped before its own bookkeeping ran)",
-        cwd=wt, check=False,
+        cwd=wt,
+        check=False,
     )
 
 
