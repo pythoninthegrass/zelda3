@@ -209,6 +209,7 @@ Always use Context7 MCP when I need library/API documentation, code generation, 
 
 - j178/prek
 - mrlesk/backlog.md
+- nousresearch/hermes-agent
 - websites/mojolang
 - websites/taskfile_dev
 - websites/zig_guide
