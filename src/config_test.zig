@@ -164,4 +164,3 @@ test "ParseConfigFile parses the [Graphics]/[Sound]/[General]/[Features] section
     // The memory buffer belongs to ReadWholeFile (libc malloc).
     free(c.g_config.memory_buffer);
 }
-

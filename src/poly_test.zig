@@ -48,7 +48,7 @@ test "Poly_Divide matches reference quotients" {
     const cases = [_]struct { a: t.uint16, b: t.uint16, q: t.uint16 }{
         .{ .a = 100, .b = 7, .q = 14 },
         .{ .a = 32773, .b = 3, .q = 54615 }, // sign16(a) set: -(-32763)/3 truncated
-        .{ .a = 64, .b = 256, .q = 0 },      // divisor reduced to 1, dividend to 0
+        .{ .a = 64, .b = 256, .q = 0 }, // divisor reduced to 1, dividend to 0
         .{ .a = 0, .b = 1, .q = 0 },
         .{ .a = 65535, .b = 65535, .q = 0 }, // both reduced to 1..0 range
     };
