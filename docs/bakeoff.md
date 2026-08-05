@@ -108,3 +108,30 @@ the ones above. Added a `zig-build` hook to `.pre-commit-config.yaml`
 gate. `scripts/burn/driver.py`'s own gate list was separately updated by
 Lance (`67d4435`) to require a `prek` pass alongside the existing
 `zig:build`/`zig:test`/`zig:difftest`/`zig:parity` gates.
+
+<!-- AB:BEGIN -->
+## Agentic re-bench (tools + gates)
+
+Re-benches the same candidate models on **TASK-003.01** (`snes/input.c` -> `snes/input.zig`), but this time with the real burn regime: tool access, compiler feedback, and up to N turns per `scripts/burn/driver.py`'s gate sequence -- scored by gates passed, not one-shot compile success. Ground truth is the merged commit `27870780` (parity-verified 7/7), replayed from its pre-port base `8605e2c0`, so 7/7 is known-achievable.
+
+How to read: `gates` = X/7 of `driver.GATES` (prek, zig:build, zig:test, zig:difftest, zig:parity, zig:parity-replay, build), run non-short-circuiting so a partial score reflects how far the attempt got. How to run: `./scripts/burn/benchmark.py run` (bare invocation replays TASK-003.01 across all 3 default candidates). `results.json` in the output dir is the machine-readable artifact.
+
+| Model | Task | Gates | Turns | Tool calls | Wall-clock | Status |
+|---|---|---|---|---|---|---|
+| Qwen3.6-35B-A3B-MTP-GGUF | TASK-003.01 | 6/7 | ? | ? | 1200s | no marker (timed out) |
+| Qwen3-Coder-Next-GGUF | TASK-003.01 | 3/7 | ? | ? | 625s | no marker |
+| Qwen3.6-27B-MTP-GGUF | TASK-003.01 | 6/7 | ? | ? | 1200s | no marker (timed out) |
+
+Per-gate detail:
+
+| Model | Task | prek | zig:build | zig:test | zig:difftest | zig:parity | zig:parity-replay | build |
+|---|---|---|---|---|---|---|---|---|
+| Qwen3.6-35B-A3B-MTP-GGUF | TASK-003.01 | y | y | n | y | y | y | y |
+| Qwen3-Coder-Next-GGUF | TASK-003.01 | n | n | y | y | n | n | y |
+| Qwen3.6-27B-MTP-GGUF | TASK-003.01 | y | y | n | y | y | y | y |
+
+Note: a `KeyboardInterrupt` inside `zig:parity`/`zig:parity-replay` tails means the model's build
+genuinely failed to compile -- Task runs the `build` and `:assets` deps concurrently, and
+cancels the sibling `:assets` step via SIGINT once `build` fails. The parity gate's fail verdict
+is correct; the traceback is just Task's cancellation mechanism, not an infra bug.
+<!-- AB:END -->

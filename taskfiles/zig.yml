@@ -77,6 +77,11 @@ tasks:
     cmds:
       - zig build difftest
 
+  ast-check:
+    desc: Run `zig ast-check` over every ported .zig file (fast, source-only; no type-checking or build)
+    cmds:
+      - find src snes -name '*.zig' -print0 | xargs -0 {{.ROOT_DIR}}/scripts/zig-ast-check.sh
+
   parity-replay:
     desc: Replay every saves/ref/Chapter*.sav reference save under headless Wayland (sway+wtype+grim) and fail on any RAM-compare mismatch
     platforms: [linux]
