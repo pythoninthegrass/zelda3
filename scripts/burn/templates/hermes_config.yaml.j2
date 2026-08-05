@@ -1,0 +1,40 @@
+model:
+  default: {{ model }}
+  provider: {{ provider }}
+providers:
+  lemonade:
+    base_url: {{ lemonade_base_url }}
+    key_env: {{ lemonade_key_env }}
+    models:
+      {{ model }}:
+        context_length: {{ llm_context_size }}
+delegation:
+  model: {{ model }}
+  provider: {{ provider }}
+  orchestrator_enabled: {{ 'true' if delegation_enabled else 'false' }}
+  max_spawn_depth: {{ 1 if delegation_enabled else 0 }}
+  max_concurrent_children: {{ 3 if delegation_enabled else 1 }}
+agent:
+  max_turns: {{ max_turns }}
+  verify_on_stop: false
+terminal:
+  backend: local
+  persistent_shell: false
+context:
+  engine: compressor
+# hermes's own token estimate ran ~35% under llama-server's real tokenizer count
+# in testing (e.g. reported ~43K when the actual request was ~66K tokens), so a
+# lower-than-default threshold leaves margin against the real ctx_size ceiling.
+compression:
+  enabled: true
+  threshold: 0.35
+approvals:
+  mode: manual
+{% if skills_dirs -%}
+skills:
+  external_dirs:
+{% for d in skills_dirs %}
+    - {{ d }}
+{% endfor -%}
+{% endif -%}
+_config_version: 33

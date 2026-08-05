@@ -16,6 +16,12 @@ repos:
         types: [file]
         files: \.zig$
         pass_filenames: false
+      - id: zig-ast-check
+        name: zig ast-check
+        entry: scripts/zig-ast-check.sh
+        language: system
+        types: [file]
+        files: \.zig$
       - id: ruff-format
         name: ruff format
         entry: ruff format
