@@ -77,6 +77,7 @@ const unit_test_files = [_][]const u8{
     "src/config_test5.zig",
     "src/poly_test.zig",
     "src/tile_detect_test.zig",
+    "src/util_test.zig",
     "snes/input_test.zig",
     "snes/cart_test.zig",
     "snes/apu_test.zig",
