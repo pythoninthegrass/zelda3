@@ -67,4 +67,3 @@ pub export fn input_read(input: *Input) u8 {
     input.latchedState |= 0x8000;
     return ret;
 }
-

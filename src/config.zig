@@ -448,14 +448,16 @@ fn ParseGamepadButtonName(value: *[*:0]const u8) c_int {
     const s = value.*;
     // Longest substring first
     const kGamepadKeyNames = [_][*:0]const u8{
-        "Back",  "Guide", "Start",    "L3",       "R3",
-        "L1",    "R1",    "DpadUp",   "DpadDown", "DpadLeft", "DpadRight", "L2", "R2",
-        "Lb",    "Rb",    "A",        "B",        "X",        "Y",
+        "Back",      "Guide", "Start",  "L3",       "R3",
+        "L1",        "R1",    "DpadUp", "DpadDown", "DpadLeft",
+        "DpadRight", "L2",    "R2",     "Lb",       "Rb",
+        "A",         "B",     "X",      "Y",
     };
     const kGamepadKeyIds = [_]t.uint8{
-        kGamepadBtn_Back, kGamepadBtn_Guide, kGamepadBtn_Start, kGamepadBtn_L3, kGamepadBtn_R3,
-        kGamepadBtn_L1,   kGamepadBtn_R1,    kGamepadBtn_DpadUp, kGamepadBtn_DpadDown, kGamepadBtn_DpadLeft, kGamepadBtn_DpadRight, kGamepadBtn_L2, kGamepadBtn_R2,
-        kGamepadBtn_L1,   kGamepadBtn_R1,    kGamepadBtn_A,     kGamepadBtn_B,        kGamepadBtn_X,        kGamepadBtn_Y,
+        kGamepadBtn_Back,      kGamepadBtn_Guide, kGamepadBtn_Start,  kGamepadBtn_L3,       kGamepadBtn_R3,
+        kGamepadBtn_L1,        kGamepadBtn_R1,    kGamepadBtn_DpadUp, kGamepadBtn_DpadDown, kGamepadBtn_DpadLeft,
+        kGamepadBtn_DpadRight, kGamepadBtn_L2,    kGamepadBtn_R2,     kGamepadBtn_L1,       kGamepadBtn_R1,
+        kGamepadBtn_A,         kGamepadBtn_B,     kGamepadBtn_X,      kGamepadBtn_Y,
     };
     for (kGamepadKeyNames, kGamepadKeyIds) |name, id| {
         if (StringStartsWithNoCase(s, name)) |r| {

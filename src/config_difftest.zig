@@ -91,13 +91,22 @@ comptime {
 // SDL keycodes the probe matrix covers (plus the ASCII range 32..126).
 const kProbeKeys = [_]c_int{
     0x40000039, // F1 .. F12
-    0x4000003A, 0x4000003B, 0x4000003C, 0x4000003D, 0x4000003E,
-    0x4000003F, 0x40000040, 0x40000041, 0x40000042, 0x40000043,
-    0x40000044, 0x40000045,
+    0x4000003A,
+    0x4000003B,
+    0x4000003C,
+    0x4000003D,
+    0x4000003E,
+    0x4000003F,
+    0x40000040,
+    0x40000041,
+    0x40000042,
+    0x40000043,
+    0x40000044,
+    0x40000045,
     0x40000052, 0x40000051, 0x40000050, 0x4000004F, // Up Down Left Right
     0x400000E0, 0x400000E4, 0x400000E1, 0x400000E5, // LCtrl RCtrl LShift RShift
     0x400000E2, 0x400000E6, // LAlt RAlt
-    '\r', '\t',
+    '\r',       '\t',
 };
 const kProbeMods = [_]c_int{ 0, 0x0003, 0x00c0, 0x0300, 0x03c3 };
 
@@ -109,7 +118,7 @@ fn dumpState(comptime flavor: []const u8) void {
     // strings they point at are dumped separately below.
     var raw: [@sizeOf(c.Config)]u8 = undefined;
     @memcpy(&raw, bytes[0..@sizeOf(c.Config)]);
-    @memset(raw[@offsetOf(c.Config, "link_graphics")..@offsetOf(c.Config, "link_graphics") + 40], 0);
+    @memset(raw[@offsetOf(c.Config, "link_graphics") .. @offsetOf(c.Config, "link_graphics") + 40], 0);
     // stderr, not stdout: the test runner prints its per-test prefix to
     // stdout before this test body runs, which would poison the parent's
     // byte diff. stderr is captured separately by runWorker's popen (2>&1
@@ -359,9 +368,9 @@ test "diff ParseConfigFile over randomized ini files (fresh process per side)" {
 
 test "diff ParseBool over fixed spellings" {
     const spellings = [_][]const u8{
-        "0",  "1",    "yes",  "no",   "true", "false", "on",  "off",
-        "Yes", "TRUE", "Off",  "NO",   "2",    "garbage", "",   "of",
-        "y",  "t",     "f",    "n",    "o",    "ofn",   "ofx",
+        "0",   "1",    "yes", "no", "true", "false",   "on",  "off",
+        "Yes", "TRUE", "Off", "NO", "2",    "garbage", "",    "of",
+        "y",   "t",    "f",   "n",  "o",    "ofn",     "ofx",
     };
     for (spellings) |s| {
         var rv_z: bool = undefined;

@@ -76,9 +76,10 @@ const kPoly1_Vtx = [6]Vertex3{
 const kPoly1_Polys = [28]t.uint8{
     3, 0, 1, 2, 7,
     3, 3, 4, 5, 6,
-    4, 0, 3, 5, 1, 5,
-    4, 1, 5, 4, 2, 4,
-    4, 3, 0, 2, 4, 3,
+    4, 0, 3, 5, 1,
+    5, 4, 1, 5, 4,
+    2, 4, 4, 3, 0,
+    2, 4, 3,
 };
 
 const PolyConfig = extern struct {

@@ -183,7 +183,6 @@ pub inline fn mirror_vars() *align(1) MirrorHdmaVars {
     return @ptrCast(&g_ram[0x6A0]);
 }
 
-
 /// variables.h:3 — main_module_index: (*(uint8*)(g_ram+0x10))
 pub inline fn main_module_index() *align(1) t.uint8 {
     return @ptrCast(&g_ram[0x10]);
