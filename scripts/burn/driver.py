@@ -40,6 +40,7 @@ Usage:
 
 import argparse
 import contextlib
+import json
 import os
 import re
 import shutil
@@ -81,7 +82,7 @@ SKIP_LIST = {"TASK-004.09"}
 
 TASKS_DIR = "backlog/tasks"
 EXIT_MARKER = "=== HERMES_EXIT:"
-ATTEMPTS: dict[str, int] = {}  # in-memory attempt counter, keyed by task id (no manifest file to persist it)
+ATTEMPTS_FILE = BURN / "attempts.json"
 
 
 def now() -> str:
@@ -148,13 +149,37 @@ def load_tasks(repo: Path = REPO) -> dict[str, Task]:
     return tasks
 
 
+def load_attempts() -> dict[str, int]:
+    if not ATTEMPTS_FILE.exists():
+        return {}
+    return json.loads(ATTEMPTS_FILE.read_text())
+
+
+def bump_attempts(task: str) -> int:
+    """Persist the attempt count to disk *before* the attempt runs.
+
+    In-memory-only counting resets to zero on every process restart, so a
+    human relaunching the driver (crash, or `resume` after a BLOCKED exit)
+    would silently grant a fresh MAX_ATTEMPTS budget -- the same
+    unbounded-retry shape the BLOCKED-stop in cmd_run() exists to prevent,
+    just moved one level up. Persisting means the budget survives restarts.
+    """
+    attempts = load_attempts()
+    attempts[task] = attempts.get(task, 0) + 1
+    ATTEMPTS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    ATTEMPTS_FILE.write_text(json.dumps(attempts))
+    return attempts[task]
+
+
 def next_ready(repo: Path = REPO) -> str | None:
+    attempts = load_attempts()
     tasks = load_tasks(repo)
     ready = [
         t
         for t in tasks.values()
         if "." in t.id  # leaf task, not a phase parent (TASK-002 vs TASK-002.01)
         and t.id not in SKIP_LIST
+        and attempts.get(t.id, 0) < MAX_ATTEMPTS  # already exhausted its budget in a prior run -- stays excluded
         and t.status == "To Do"
         and all(tasks.get(d, Task("", "")).status == "Done" for d in t.dependencies)
     ]
@@ -402,7 +427,7 @@ def cmd_run(once: bool, push: bool) -> int:
         md = task_md(wt, task)
         prompt_file = BURN / "prompts" / f"{task}.txt"
         prompt_file.write_text(header + "\n\n=== TASK FILE ===\n" + md.read_text())
-        attempt = ATTEMPTS[task] = ATTEMPTS.get(task, 0) + 1
+        attempt = bump_attempts(task)
         log = BURN / "logs" / f"{task}.a{attempt}.log"
         (BURN / "logs/current").unlink(missing_ok=True)
         (BURN / "logs/current").symlink_to(log)
@@ -483,6 +508,9 @@ def cmd_status() -> int:
     print("backlog:", " ".join(f"{k}={v}" for k, v in sorted(counts.items())))
     nxt = next_ready()
     print("next ready:", nxt or "none (queue drained or stalled on SKIP_LIST)")
+    blocked = {tid: n for tid, n in load_attempts().items() if n >= MAX_ATTEMPTS}
+    if blocked:
+        print("blocked (exhausted attempts, needs triage):", ", ".join(f"{k}({v})" for k, v in sorted(blocked.items())))
     print("kill sentinel:", "PRESENT" if KILL_FILE.exists() else "absent")
     if ORCH_OVERRIDE.exists():
         print("orchestrator override:", ORCH_OVERRIDE.read_text().strip())
