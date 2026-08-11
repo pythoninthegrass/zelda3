@@ -48,6 +48,7 @@ pub fn build(b: *std.Build) void {
     exe.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "dsp", "snes/dsp.zig"));
     exe.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "spc", "snes/spc.zig"));
     exe.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "ppu", "snes/ppu.zig"));
+    exe.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "snes", "snes/snes.zig"));
 
     linkSdl2(b, exe_mod);
 
@@ -477,7 +478,6 @@ fn compileCStub(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.b
 const sources = [_][]const u8{
     "snes/cpu.c",
     "snes/snes_other.c",
-    "snes/snes.c",
     "snes/tracing.c",
     "src/ancilla.c",
     "src/attract.c",
