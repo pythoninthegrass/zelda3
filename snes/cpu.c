@@ -171,6 +171,10 @@ void cpu_setFlags(Cpu* cpu, uint8_t val) {
   }
 }
 
+void cpu_clearIrqWanted(Cpu* cpu) {
+  cpu->irqWanted = false;
+}
+
 static void cpu_setZN(Cpu* cpu, uint16_t value, bool byte) {
   if(byte) {
     cpu->z = (value & 0xff) == 0;
