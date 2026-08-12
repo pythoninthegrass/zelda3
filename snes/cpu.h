@@ -54,5 +54,6 @@ int cpu_runOpcode(Cpu* cpu);
 void cpu_saveload(Cpu *cpu, SaveLoadFunc *func, void *ctx);
 uint8_t cpu_getFlags(Cpu *cpu);
 void cpu_setFlags(Cpu *cpu, uint8_t val);
+void cpu_clearIrqWanted(Cpu *cpu);
 
 #endif
