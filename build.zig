@@ -39,6 +39,7 @@ pub fn build(b: *std.Build) void {
     });
 
     exe.root_module.addObjectFile(addPortedModule(b, target, optimize, "config"));
+    exe.root_module.addObjectFile(addPortedModule(b, target, optimize, "spc_player"));
     exe.root_module.addObjectFile(addPortedModule(b, target, optimize, "poly"));
     exe.root_module.addObjectFile(addPortedModule(b, target, optimize, "tile_detect"));
     exe.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "input", "snes/input.zig"));
@@ -497,7 +498,6 @@ const sources = [_][]const u8{
     "src/player_oam.c",
     "src/player.c",
     "src/select_file.c",
-    "src/spc_player.c",
     "src/sprite_main.c",
     "src/sprite.c",
     "src/tagalong.c",
