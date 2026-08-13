@@ -1,10 +1,10 @@
 ---
 id: TASK-003
 title: Phase 2 — Port the snes/ emulator island to Zig
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-08-02 04:18'
-updated_date: '2026-08-03 00:46'
+updated_date: '2026-08-13 16:37'
 labels: []
 milestone: m-0
 dependencies: []
@@ -22,9 +22,21 @@ Full plan context: /Users/lance/.claude/plans/i-m-interested-in-porting-polished
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 task zig:build compiles clean
-- [ ] #2 Running the binary with zelda3.sfc loaded shows zero 'Memory compare failed' lines on stderr (RAM-compare oracle)
-- [ ] #3 Replay of reference saves (saves/ref/Chapter*.sav) stays clean
-- [ ] #4 The file's C-ABI symbols are unchanged so remaining .c files link without edits
-- [ ] #5 zelda3.bak and the C taskfile.yml build remain untouched and working
+- [x] #1 task zig:build compiles clean
+- [x] #2 Running the binary with zelda3.sfc loaded shows zero 'Memory compare failed' lines on stderr (RAM-compare oracle)
+- [x] #3 Replay of reference saves (saves/ref/Chapter*.sav) stays clean
+- [x] #4 The file's C-ABI symbols are unchanged so remaining .c files link without edits
+- [x] #5 zelda3.bak and the C taskfile.yml build remain untouched and working
 <!-- DOD:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+All 8 planned per-file ports of the snes/ emulator island to Zig are complete: input.zig, cart.zig, apu.zig, dma.zig, dsp.zig, ppu.zig, spc.zig, snes.zig, and snes_other.zig (TASK-003.09, just finished) all compile via build.zig and are wired into the exe in place of their original .c sources.
+
+snes/cpu.c and snes/tracing.c intentionally remain C, as scoped in the parent description — they're the RAM-compare oracle's CPU core and were never planned for porting in this phase.
+
+Verification (via the final subtask, TASK-003.09, re-run against the full current tree): `zig build` compiles clean; `task zig:parity` reports zero RAM-compare mismatches against the original ROM; `task zig:parity-replay` reports zero mismatches across all 13 saves/ref/Chapter*.sav reference-save replays; the legacy C-only `task build` path still compiles and links unmodified using zelda3.bak/taskfile.yml, untouched throughout the whole migration.
+
+Follow-up (not in this phase's scope): porting cpu.c/tracing.c themselves, if ever desired, per the parent description's "port them last if at all."
+<!-- SECTION:FINAL_SUMMARY:END -->
