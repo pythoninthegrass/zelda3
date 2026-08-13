@@ -70,7 +70,14 @@ extern fn TileCheckForMirrorBonk() void;
 extern fn TileDetect_SwordSwingDeepInDoor(dw: t.uint8) void;
 extern fn TileDetect_ResetState() void;
 extern fn TileDetection_Execute(x: t.uint16, y: t.uint16, bits: t.uint16) void;
-extern fn TileDetect_ExecuteInner(tile: t.uint8, offs: t.uint16, bits: t.uint16, is_indoors: bool) void;
+// is_indoors is declared u8 (not bool) and passed via @intFromBool at the call
+// sites: a Zig `bool` argument only defines bit 0, whereas clang lowers the C
+// `_Bool is_indoors` parameter to a full-register test relying on the x86-64
+// psABI caller-zero-extension convention. Passing u8 forces Zig codegen to
+// zero-extend the argument, so the C reference and the Zig port both see the
+// same clean 0/1 instead of the C side misreading PRNG garbage left in the
+// register's upper bits under ReleaseFast. Same hazard as [[snes/dma_difftest]].
+extern fn TileDetect_ExecuteInner(tile: t.uint8, offs: t.uint16, bits: t.uint16, is_indoors: u8) void;
 
 // Pre-port C reference (tile_detect.c), symbols renamed to c_<name> by the preprocessor.
 extern fn c_Overworld_GetTileAttributeAtLocation(x: t.uint16, y: t.uint16) t.uint8;
@@ -86,7 +93,7 @@ extern fn c_TileCheckForMirrorBonk() void;
 extern fn c_TileDetect_SwordSwingDeepInDoor(dw: t.uint8) void;
 extern fn c_TileDetect_ResetState() void;
 extern fn c_TileDetection_Execute(x: t.uint16, y: t.uint16, bits: t.uint16) void;
-extern fn c_TileDetect_ExecuteInner(tile: t.uint8, offs: t.uint16, bits: t.uint16, is_indoors: bool) void;
+extern fn c_TileDetect_ExecuteInner(tile: t.uint8, offs: t.uint16, bits: t.uint16, is_indoors: u8) void;
 
 var prng: ?std.Random.DefaultPrng = null;
 fn rnd() std.Random {
@@ -194,10 +201,10 @@ test "diff TileDetect_ResetState over random dirty state" {
 }
 
 fn cInner() void {
-    c_TileDetect_ExecuteInner(arg_tile, arg_offs, arg_bits, arg_indoors);
+    c_TileDetect_ExecuteInner(arg_tile, arg_offs, arg_bits, @intFromBool(arg_indoors));
 }
 fn zInner() void {
-    TileDetect_ExecuteInner(arg_tile, arg_offs, arg_bits, arg_indoors);
+    TileDetect_ExecuteInner(arg_tile, arg_offs, arg_bits, @intFromBool(arg_indoors));
 }
 
 test "diff TileDetect_ExecuteInner over every tile value, indoors and out" {
