@@ -66,7 +66,13 @@ extern fn dma_doDma(dma: *Dma) void;
 extern fn dma_initHdma(dma: *Dma) void;
 extern fn dma_doHdma(dma: *Dma) void;
 extern fn dma_cycle(dma: *Dma) bool;
-extern fn dma_startDma(dma: *Dma, val: u8, hdma: bool) void;
+// hdma is declared u8 (not bool) here and passed via @intFromBool: a Zig `bool`
+// argument only defines bit 0, but clang lowers the C `_Bool hdma` parameter to a
+// full-register test (`test %edx,%edx`, per the x86-64 psABI zero-extension
+// convention). A u8 argument is zero-extended by Zig codegen, so both the C
+// reference and the Zig port see an identical clean 0/1. (bool would let ReleaseFast
+// leave PRNG garbage in the arg register's upper bits, which the C side misreads.)
+extern fn dma_startDma(dma: *Dma, val: u8, hdma: u8) void;
 
 extern fn c_dma_init(snes: ?*anyopaque) ?*Dma;
 extern fn c_dma_free(dma: ?*Dma) void;
@@ -78,7 +84,7 @@ extern fn c_dma_doDma(dma: *Dma) void;
 extern fn c_dma_initHdma(dma: *Dma) void;
 extern fn c_dma_doHdma(dma: *Dma) void;
 extern fn c_dma_cycle(dma: *Dma) bool;
-extern fn c_dma_startDma(dma: *Dma, val: u8, hdma: bool) void;
+extern fn c_dma_startDma(dma: *Dma, val: u8, hdma: u8) void;
 
 var prng: ?std.Random.DefaultPrng = null;
 fn rnd() std.Random {
@@ -308,8 +314,8 @@ test "diff dma_startDma over randomized bitmask/hdma flag streams" {
         while (steps < 16) : (steps += 1) {
             const val = rnd().int(u8);
             const hdma = rnd().boolean();
-            c_dma_startDma(&c_dma, val, hdma);
-            dma_startDma(&z_dma, val, hdma);
+            c_dma_startDma(&c_dma, val, @intFromBool(hdma));
+            dma_startDma(&z_dma, val, @intFromBool(hdma));
             try diffState(&c_dma, &z_dma, "startDma step");
         }
     }
