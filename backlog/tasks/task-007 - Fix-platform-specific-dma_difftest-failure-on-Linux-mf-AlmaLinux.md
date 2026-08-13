@@ -5,7 +5,7 @@ status: Done
 assignee:
   - claude
 created_date: '2026-08-03 05:54'
-updated_date: '2026-08-13 17:44'
+updated_date: '2026-08-13 18:04'
 labels:
   - zig-port
   - bug
@@ -66,6 +66,18 @@ In `snes/dma_difftest.zig`, pass a zero-extended integer for `hdma` instead of a
 - Regression: `zig build`, `task zig:parity`, `task zig:parity-replay`, clean-tree `task build`.
 - Remove all temporary debug instrumentation before final commit.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Preemptive follow-up (same task, related hazard): hardened `src/tile_detect_difftest.zig` against the identical Zig->C `bool`-argument ABI hazard that caused the dma_startDma failure. The harness passed `is_indoors: bool` to both `TileDetect_ExecuteInner` (Zig port) and `c_TileDetect_ExecuteInner` (renamed C ref). Zig only guarantees bit 0 of a `bool` argument; clang lowers the C `_Bool` parameter to a full-register test relying on the x86-64 psABI caller-zero-extension convention, so PRNG garbage in the argument register's upper bits could make the C side misread the flag under ReleaseFast.
+
+What changed: typed the `is_indoors` param `u8` on both extern decls (`TileDetect_ExecuteInner`, `c_TileDetect_ExecuteInner`) and pass `@intFromBool(arg_indoors)` at both call sites (`cInner`/`zInner`) — exact same fix shape as the `hdma` change in `snes/dma_difftest.zig`. Added an explanatory comment at the decl.
+
+Why preemptive: this test had NOT flaked (it uses a fixed PRNG seed 0x71de7ec7 and the arg happened to land clean), but it is the same latent pattern, so it was hardened rather than left to flake later.
+
+Verification (mf/AlmaLinux x86-64): `zig build difftest` passes; the standalone post-edit tile_detect_difftest binary passes 20/20 fresh-process runs; disassembly confirms the C-ref call site now emits `movzbl %r15b,%ecx` (explicit zero-extension of the 4th SysV integer arg) before `call c_TileDetect_ExecuteInner`, so the C-side full-register test is safe. Regression: `zig build` exit 0, `task zig:parity` -> PARITY OK, `task zig:ast-check` exit 0. Committed as a separate conventional commit on branch task-007-dma-difftest-fix.
+<!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
