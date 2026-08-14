@@ -73,20 +73,29 @@ pub inline fn UintMax(a: uint, b: uint) uint {
 
 // The punning helpers accept any single-item pointer (comptime-enforced)
 // and reinterpret its address, matching how the C macros apply to array
-// elements, struct fields, and g_ram-backed lvalues alike.
-pub inline fn byte(x: anytype) *align(1) uint8 {
+// elements, struct fields, and g_ram-backed lvalues alike. The result
+// preserves the input's const-ness (a `*const u8` in yields a
+// `*align(1) const T` out) so read-only C locals (`const uint8 *src`)
+// can still be punned for reading without needing a `@constCast`.
+fn Pun(comptime In: type, comptime Out: type) type {
+    return if (@typeInfo(In).pointer.is_const) *align(1) const Out else *align(1) Out;
+}
+
+pub inline fn byte(x: anytype) Pun(@TypeOf(x), uint8) {
     return @ptrCast(x);
 }
 
-pub inline fn hibyte(x: anytype) *align(1) uint8 {
-    return byte(@as([*]align(1) uint8, @ptrCast(x)) + 1);
+pub inline fn hibyte(x: anytype) Pun(@TypeOf(x), uint8) {
+    const Many = if (@typeInfo(@TypeOf(x)).pointer.is_const) [*]align(1) const uint8 else [*]align(1) uint8;
+    const p: Many = @ptrCast(x);
+    return &p[1];
 }
 
-pub inline fn word(x: anytype) *align(1) uint16 {
+pub inline fn word(x: anytype) Pun(@TypeOf(x), uint16) {
     return @ptrCast(x);
 }
 
-pub inline fn dword(x: anytype) *align(1) uint32 {
+pub inline fn dword(x: anytype) Pun(@TypeOf(x), uint32) {
     return @ptrCast(x);
 }
 
