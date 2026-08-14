@@ -42,6 +42,7 @@ pub fn build(b: *std.Build) void {
     exe.root_module.addObjectFile(addPortedModule(b, target, optimize, "spc_player"));
     exe.root_module.addObjectFile(addPortedModule(b, target, optimize, "poly"));
     exe.root_module.addObjectFile(addPortedModule(b, target, optimize, "tile_detect"));
+    exe.root_module.addObjectFile(addPortedModule(b, target, optimize, "load_gfx"));
     exe.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "input", "snes/input.zig"));
     exe.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "cart", "snes/cart.zig"));
     exe.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "apu", "snes/apu.zig"));
@@ -487,7 +488,6 @@ const sources = [_][]const u8{
     "src/ending.c",
     "src/glsl_shader.c",
     "src/hud.c",
-    "src/load_gfx.c",
     "src/main.c",
     "src/messaging.c",
     "src/misc.c",
