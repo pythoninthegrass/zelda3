@@ -45,6 +45,7 @@ pub fn build(b: *std.Build) void {
     exe.root_module.addObjectFile(addPortedModule(b, target, optimize, "load_gfx"));
     exe.root_module.addObjectFile(addPortedModule(b, target, optimize, "nmi"));
     exe.root_module.addObjectFile(addPortedModule(b, target, optimize, "overlord"));
+    exe.root_module.addObjectFile(addPortedModule(b, target, optimize, "player_oam"));
     exe.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "input", "snes/input.zig"));
     exe.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "cart", "snes/cart.zig"));
     exe.root_module.addObjectFile(addPortedModuleAt(b, target, optimize, "apu", "snes/apu.zig"));
@@ -495,7 +496,6 @@ const sources = [_][]const u8{
     "src/misc.c",
     "src/opengl.c",
     "src/overworld.c",
-    "src/player_oam.c",
     "src/player.c",
     "src/select_file.c",
     "src/sprite_main.c",
