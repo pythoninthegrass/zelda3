@@ -1,7 +1,8 @@
 // Port of src/variables.h: the g_ram accessor bank. Every C macro of the
 // form `(*(type*)(g_ram+off))` / `((type*)(g_ram+off))` becomes an inline
 // fn returning a *align(1) (or many-item) pointer into the extern g_ram
-// symbol, which stays defined in C (zelda_rtl.c) during the migration.
+// symbol, defined in zelda_rtl.zig (moved from C in TASK-004.07; the C
+// side declares it via `extern uint8 g_ram[131072]` in variables.h).
 // Dereference the result to read, assign through it to write:
 //   v.link_y_coord().*     <-> link_y_coord
 //   v.oam_buf()[i]         <-> oam_buf[i]
@@ -24,7 +25,8 @@
 
 const t = @import("types.zig");
 
-/// Mirror of the C `g_ram` symbol (extern uint8 g_ram[131072] in zelda_rtl.c).
+/// Mirror of the `g_ram` symbol, defined in zelda_rtl.zig (the C side
+/// declares `extern uint8 g_ram[131072]` in variables.h).
 pub extern var g_ram: [0x20000]u8;
 
 // C ABI twin of ZeldaEnv's sram member (src/zelda_rtl.h); only the one

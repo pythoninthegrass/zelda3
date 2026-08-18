@@ -174,6 +174,24 @@ pub export fn PpuCopyOamFromBuffer(ppu: *anyopaque, src: [*]const u8) void {
     @memcpy(std.mem.asBytes(&p.oam), src[0..@sizeOf(@TypeOf(p.oam))]);
 }
 
+// More opaque accessors for the src/zelda_rtl.zig port (ZeldaDrawPpuFrame /
+// ZeldaInitialize reach a few Ppu fields): mode, the vram array base, and
+// extraLeftRight.
+pub export fn PpuGetCurrentMode(ppu: *anyopaque) u8 {
+    const p: *Ppu = @ptrCast(@alignCast(ppu));
+    return p.mode;
+}
+
+pub export fn PpuGetVram(ppu: *anyopaque) [*]u16 {
+    const p: *Ppu = @ptrCast(@alignCast(ppu));
+    return @ptrCast(&p.vram[0]);
+}
+
+pub export fn PpuGetExtraSideSpace(ppu: *anyopaque) u8 {
+    const p: *Ppu = @ptrCast(@alignCast(ppu));
+    return p.extraLeftRight;
+}
+
 pub export fn ppu_reset(ppu: *Ppu) void {
     @memset(&ppu.vram, 0);
     ppu.lastBrightnessMult = 0xff;
