@@ -36,10 +36,55 @@ can't overflow), plain `|`/`^` is equivalent and simplest.
 ### `zig` on PATH may not be the pinned version
 
 `~/.local/share/mise/installs/zig/mach-latest/bin/zig` (a 0.14.0-dev nightly) can sit ahead
-of the mise shim for the pinned 0.16.0 on `PATH`, causing `zig build`/`task zig:build` to
-silently use the wrong compiler and produce misleading `build.zig.zon` parse errors. Verify
-with `mise which zig` before treating a build error as a real bug. This has independently
-bitten both a human session and a headless agent run.
+of the mise shim for the pinned 0.16.0 on `PATH` in a shell that isn't mise-activated
+(headless/sandboxed agent runs), causing a bare `zig build` to silently use the wrong
+compiler and produce misleading `build.zig.zon` parse errors. The `task`/`task zig:*`
+wrappers now pin this themselves (a `{{.ZIG}}` var resolved via `mise which zig`, used
+instead of bare `zig` in every `cmds:` line — see `taskfile.yml`), so prefer those over a
+raw `zig` invocation. If you do run `zig` directly, check `mise which zig` first.
+
+### No `do-while`
+
+Zig has no `do { ... } while (cond);`. Rewrite as `while (true) { ...; if (!cond) break; }`.
+
+### Array-of-sentinel-strings literal syntax
+
+`const k = [_][:0]const u8{ "a", "b" };` (no leading `.` before the brace when the length is
+inferred with `[_]`), or `const k: [N][:0]const u8 = .{ "a", "b" };` with an explicit type.
+Pass `k[i].ptr` where a `%s`/`[*:0]const u8` is expected.
+
+### Commas are not statement separators
+
+Unlike a C `for(a, b, c)`-style comma expression, a bare `,` does not chain statements in
+Zig. One statement per line/`;`.
+
+### Can't slice an optional pointer
+
+Unwrap with `.?` before slicing: `ptr.?[0..len]`, not `ptr[0..len]` when `ptr: ?[*]T`.
+
+## ReleaseFast runtime traps
+
+### `@intCast` keeps its range check; `@truncate` doesn't
+
+C's implicit narrowing conversion silently truncates. Zig's `@intCast` keeps a safety check
+even in `ReleaseFast` (there's no `-DNDEBUG` equivalent) and will `SIGTRAP` at runtime the
+first time the value doesn't fit — this showed up as a frame-1 crash during TASK-004.07.
+Where the C code relied on silent truncation, use `@truncate`, not `@intCast`, to match C
+bit-for-bit.
+
+## When the Zig compiler crashes (SEGV) instead of erroring
+
+Zig 0.16.0 has a real compiler SEGV (not a type error) triggered by an inline `@ptrCast` of
+a foreign pointee fed directly into `std.mem.copyForwards`, which takes **slices**, not
+many-item pointers — binding the cast to a typed local, or building a proper destination
+slice first, avoids it. If `zig build`/`zig ast-check` segfaults rather than printing a
+diagnostic, suspect a `@ptrCast`-into-a-slice-taking-`std.mem` call before assuming a bug in
+your own logic.
+
+Debug this by writing a **small standalone repro in the scratchpad**, not by truncating the
+real file with `head -N` and iterating on the truncated copy — that produces throwaway
+`.rtl_bisect.zig`/`.rtl_draft.zig`/`.rtl_recover.zig`-style litter in the repo root and
+doesn't actually isolate the failing construct any faster.
 
 ## Headless/agent session hygiene
 
