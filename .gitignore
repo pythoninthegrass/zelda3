@@ -37,6 +37,10 @@ CLAUDE.md
 /glsl-shaders
 /token.txt
 
+# Entire session-capture tooling (local, not shared)
+/.pi/
+/.entire/
+
 # General
 .DS_Store
 .localized
