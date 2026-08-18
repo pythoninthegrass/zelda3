@@ -1,0 +1,41 @@
+{
+  "cli_version": "0.10.0",
+  "checkpoint_id": "01M0ACXS7PVDEZ95N8P008747J",
+  "session_id": "01a01310-4efa-72b8-a7a4-16cc49955ada",
+  "strategy": "manual-commit",
+  "created_at": "2026-08-18T12:18:19.006116184Z",
+  "branch": "task-004.06-misc-zig",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [
+    "backlog/tasks/task-004.06 - Port-src-misc.c-to-misc.zig.md",
+    "build.zig",
+    "src/misc.zig"
+  ],
+  "agent": "Pi",
+  "model": "Qwen3.8-27B-UD-Q8_K_XL",
+  "turn_id": "bdaa1c684d3c",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 153
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-08-18T12:18:18.951306868Z",
+    "agent_lines": 1099,
+    "agent_removed": 10,
+    "human_added": 0,
+    "human_modified": 48,
+    "human_removed": 0,
+    "total_committed": 1147,
+    "total_lines_changed": 1157,
+    "agent_percentage": 95.85133967156439,
+    "metric_version": 2
+  }
+}

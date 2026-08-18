@@ -1,0 +1,81 @@
+You are porting src/misc.c to idiomatic Zig (src/misc.zig) in this repository (zelda3: a reverse-engineered C reimplementation of The Legend of Zelda: A Link to the Past, currently mid-way through an incremental C-to-Zig port at behavioral parity, verified by a RAM-compare oracle against the original ROM). This is backlog task TASK-004.06.
+
+## Goal
+Port `src/misc.c` (960 lines), containing `Module_MainRouting` — the top-level game-state dispatcher called every frame from `ZeldaRunGameLoop` — to `src/misc.zig`, matching C-ABI symbols exactly so the remaining .c callers link unchanged. This is a deeply interconnected core file (18 includes: variables.h, hud.h, dungeon.h, overworld.h, load_gfx.h, sprite.h, poly.h, ancilla.h, select_file.h, tile_detect.h, player.h, player_oam.h, messaging.h, ending.h, attract.h, snes/snes_regs.h, assets.h) — go carefully and re-verify parity thoroughly given how central Module_MainRouting is.
+
+## Public C-ABI surface to preserve exactly (from src/misc.h)
+Functions (extern "C", exact names/signatures, called by other .c files that must link unchanged):
+SrcPtr, Ancilla_Sfx2_Near, Ancilla_Sfx3_Near, LoadDungeonRoomRebuildHUD, Module_Unknown0, Module_Unknown1,
+Module_MainRouting, NMI_PrepareSprites, Sound_LoadIntroSongBank, LoadOverworldSongs, LoadDungeonSongs,
+LoadCreditsSongs, Dungeon_LightTorch, RoomDraw_AdjustTorchLightingChange, Dungeon_PrepOverlayDma_nextPrep,
+Dungeon_PrepOverlayDma_watergate, Module05_LoadFile, Module13_BossVictory_Pendant, BossVictory_Heal,
+Dungeon_StartVictorySpin, Dungeon_RunVictorySpin, Dungeon_CloseVictorySpin, Module15_MirrorWarpFromAga,
+Module16_BossVictory_Crystal, Module16_04_FadeAndEnd, TriforceRoom_LinkApproachTriforce,
+AncillaAdd_ItemReceipt, ItemReceipt_GiveBottledItem, Module17_SaveAndQuit,
+WallMaster_SendPlayerToLastEntrance, GetRandomNumber, Link_CalculateSfxPan, SpriteSfx_QueueSfx1WithPan,
+SpriteSfx_QueueSfx2WithPan, SpriteSfx_QueueSfx3WithPan, Sprite_CalculateSfxPan, CalculateSfxPan,
+CalculateSfxPan_Arbitrary, Init_LoadDefaultTileAttr, Main_ShowTextMessage, HandleItemTileAction_Overworld
+
+Data symbol: `extern const uint16 kMemoryLocationToGiveItemTo[76];` — defined in misc.c (line 60), must be
+re-exported from misc.zig as an extern "C" const array with identical layout/values (other .c files
+read it by name).
+
+Two header-only static-inline helpers (`GetOamCurPtr`, `FindInByteArray`, `FindInWordArray`) live in
+misc.h itself, not misc.c — they are NOT linked symbols and do not need porting/exporting. If misc.zig
+needs equivalent logic internally, reimplement it Zig-natively (see the existing pattern in
+src/player_oam.zig, which already has its own private zig-idiomatic FindInByteArray using slices
+instead of a separate size param — do the same rather than trying to call the C header inline).
+
+## Established port pattern — study these first
+- `src/player_oam.zig` — most recently completed port (TASK-004.05), same file scale/style: header
+  comment explaining what it ports and the C-ABI/RAM-compare contract, `const t = @import("types.zig")`,
+  `const v = @import("variables.zig")` for g_ram access, `extern "C" fn` for every exported symbol,
+  `extern const ... : [N]t.uintN` for shared data, inline helpers for repeated C macros
+  (e.g. features0 flag checks via direct g_ram byte access since C-only macros aren't in variables.zig).
+- `build.zig`:
+  - Line ~496: the static `sources` array still lists `"src/misc.c"` — remove this line once misc.zig
+    is complete and wired in (matches how player_oam.c was dropped from `sources` when player_oam.zig
+    landed — note player_oam.c is still kept on disk as a reference/backup, just removed from the build).
+  - Line ~48: add `exe.root_module.addObjectFile(addPortedModule(b, target, optimize, "misc"));` in the
+    same list as the other ported modules (config, spc_player, poly, tile_detect, load_gfx, nmi,
+    overlord, player_oam, ...) — `addPortedModule` (build.zig:144) wires `src/<name>.zig` in
+    automatically; no other build.zig change needed.
+- Look at a few other already-ported modules for variety of idiom (e.g. overlord.zig, load_gfx.zig,
+  nmi.zig) especially ones that touch sprites/HUD/dungeon state similar to what misc.c touches.
+
+## Steps
+1. Read src/misc.c and src/misc.h fully. Read the 18 included headers as needed to understand the
+   types and cross-module calls misc.c makes (you are not porting those modules — only calling into
+   their still-C or already-ported-Zig APIs exactly as misc.c does today).
+2. Read 2-3 existing ported .zig modules (player_oam.zig at minimum, plus 1-2 more) to internalize the
+   house style: extern "C" export style, g_ram access via variables.zig accessors, types.zig aliases,
+   comment conventions.
+3. Write src/misc.zig porting every function and the data symbol above, preserving exact C-ABI names,
+   signatures, and behavior (byte-for-byte where the original 65816 code and the RAM-compare oracle
+   expect it — no behavioral "improvements").
+4. Update build.zig: remove `"src/misc.c"` from `sources` (~line 496), add the `addPortedModule(...,
+   "misc")` wiring call (~line 48, alongside the other ported modules).
+5. Build and verify (from repo root):
+   - `task zig:build` — must compile clean.
+   - `task zig:ast-check` — quick source-only check.
+   - `task zig:parity` — runs the Zig-built binary against zelda3.sfc and reports RAM-compare pass/fail.
+     Zero "Memory compare failed" lines on stderr is the bar.
+   - `task zig:parity-replay` — replays every saves/ref/Chapter*.sav reference save under headless
+     Wayland and fails on any RAM-compare mismatch across overworld/dungeon/menus. Run this too before
+     declaring done — it's the strongest signal for a file this central.
+6. If parity fails, diagnose against the original src/misc.c (still on disk, unmodified — do NOT
+   remove or edit misc.c's content, only stop compiling it) and fix misc.zig. Iterate until clean or
+   until you've made your best-effort attempt and are genuinely stuck — in that case, stop and report
+   exactly what's failing (which function, which save/state, what the RAM-compare diff shows) rather
+   than declaring success prematurely.
+
+## Definition of Done
+- `task zig:build` compiles clean.
+- Zero "Memory compare failed" lines on stderr with zelda3.sfc loaded (task zig:parity).
+- saves/ref/Chapter*.sav replay stays clean (task zig:parity-replay).
+- misc.zig's exported C-ABI symbols are unchanged so remaining .c files link without edits.
+- zelda3.bak and the C taskfile.yml build remain untouched and working (don't touch anything under
+  taskfile.yml's C build path — only build.zig / taskfiles/zig.yml concerns you here).
+
+Do not mark this done unless the parity gate is actually green. If you plateau short of full parity,
+report precisely where it breaks so a human can pick up from there.
