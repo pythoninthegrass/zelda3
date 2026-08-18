@@ -22,6 +22,12 @@ repos:
         language: system
         types: [file]
         files: \.zig$
+      - id: check-line-ending-preserved
+        name: check line ending preserved
+        entry: scripts/check-line-ending-preserved.sh
+        language: system
+        types: [file]
+        files: \.(c|h)$
       - id: ruff-format
         name: ruff format
         entry: ruff format
