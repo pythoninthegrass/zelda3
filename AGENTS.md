@@ -169,6 +169,15 @@ reimplementation's `g_ram`. Passing a ROM on the command line enables comparing 
 This is the project's primary correctness signal for game-logic ports — new/changed C logic should keep
 producing identical RAM state to the original when this mode is enabled.
 
+### Zig porting gotchas
+
+`@as(T, x) OP y` and `@as(T, x) OP (if ...)` can mis-parse — parenthesize the non-`@as` side
+rather than substituting different logic to dodge the error. Zig 0.16 dropped standalone
+`|%`/`^%` (compound forms still work). `zig` on `PATH` may resolve to a stale mise
+`mach-latest` build instead of the pinned 0.16.0 — check with `mise which zig` before
+trusting a build error. Headless agent runs must not end mid-task with unremoved debug
+instrumentation or no summary. Details and a real incident: `docs/development.md`.
+
 ### Feature flags
 
 `src/features.h` defines non-authentic enhancements (widescreen, bug fixes, control tweaks, etc.) as bits
