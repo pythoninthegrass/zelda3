@@ -1,0 +1,2 @@
+{"v":1,"agent":"pi","cli_version":"0.10.0","type":"user","ts":"2026-08-18T04:06:07.350Z","content":[{"text":"Reply with exactly: PING_OK"}]}
+{"v":1,"agent":"pi","cli_version":"0.10.0","type":"assistant","ts":"2026-08-18T04:06:10.376Z","id":"a9dc8521","content":[{"type":"text","text":"PING_OK"}]}
