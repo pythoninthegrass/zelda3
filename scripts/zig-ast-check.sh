@@ -16,7 +16,7 @@ fi
 
 fail=0
 for f in "$@"; do
-  if ! zig ast-check --color off "$f"; then
+  if ! "${ZIG_BIN:-zig}" ast-check --color off "$f"; then
     fail=1
   fi
 done
