@@ -4,15 +4,8 @@
 # requires-python = ">=3.13,<3.14"
 # dependencies = [
 #     "python-decouple>=3.8",
-#     "burnkit",
+#     "burnkit @ git+https://github.com/pythoninthegrass/burnkit@v0.1.0",
 # ]
-#
-# # burnkit is not published yet, so it resolves from the sibling checkout in
-# # ~/git. Replace this block with a tag pin -- "burnkit @
-# # git+https://github.com/pythoninthegrass/burnkit@vX.Y.Z" in dependencies --
-# # once it is published.
-# [tool.uv.sources]
-# burnkit = { path = "../../../burnkit", editable = true }
 # ///
 
 """Overnight backlog-burn driver for the C -> Zig port: this repo's burnkit config.

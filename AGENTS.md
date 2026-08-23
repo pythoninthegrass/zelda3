@@ -209,8 +209,9 @@ when needed for RAM comparison.
 (`run`/`resume`/`status`/`kill`, same as always). It is a **config shim**: the
 shared mechanics — the Backlog.md task queue, the per-task git worktree
 lifecycle, the launch backends, the finish-marker protocol, and the
-proof-of-done gates — live in `burnkit` (`~/git/burnkit`, resolved through the
-script's PEP 723 block). What stays here is this repo's configuration of it:
+proof-of-done gates — live in
+[`burnkit`](https://github.com/pythoninthegrass/burnkit), pinned to a tag in the
+script's PEP 723 block. What stays here is this repo's configuration of it:
 the models, the seven Zig gates, the local-only `feat/zig-port-burn` branch,
 the pre-port ROM the parity oracle needs, and the prompt prose in
 `scripts/burn/prompt_header.txt`.

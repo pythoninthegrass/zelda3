@@ -4,11 +4,8 @@
 # requires-python = ">=3.13,<3.14"
 # dependencies = [
 #     "python-decouple>=3.8",
-#     "burnkit",
+#     "burnkit @ git+https://github.com/pythoninthegrass/burnkit@v0.1.0",
 # ]
-#
-# [tool.uv.sources]
-# burnkit = { path = "../../../burnkit", editable = true }
 # ///
 
 """Unit tests for this repo's burnkit configuration in driver.py.

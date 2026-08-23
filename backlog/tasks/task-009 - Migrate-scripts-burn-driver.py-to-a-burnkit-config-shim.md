@@ -4,7 +4,7 @@ title: Migrate scripts/burn/driver.py to a burnkit config shim
 status: Done
 assignee: []
 created_date: '2026-08-23 10:40'
-updated_date: '2026-08-23 10:53'
+updated_date: '2026-08-23 11:02'
 labels: []
 dependencies: []
 references:
@@ -78,7 +78,7 @@ Two behavior changes worth naming:
 
 The scope gate is registered as `ANY_PATH` for both `code_change_prefixes` and `code_task_allowed_prefixes`, matching pre-migration behavior: every task is gated as a code task, and no path is out of scope. A port task can be a pure `build.zig` or unit-test-list edit and still change what the parity oracle sees, and no allow-list has ever been enforced here, so guessing one would block legitimate overnight work rather than catch anything. Narrowing it is worth a follow-up, not a blind guess during a migration.
 
-burnkit is not published yet, so the PEP 723 blocks resolve it from the sibling `~/git/burnkit` checkout via `[tool.uv.sources]` with a relative path. Those become a tag pin once burnkit is pushed.
+burnkit is now public at <https://github.com/pythoninthegrass/burnkit> and tagged `v0.1.0`, so all three PEP 723 blocks (`driver.py`, `benchmark.py`, `test_driver.py`) pin `burnkit @ git+https://github.com/pythoninthegrass/burnkit@v0.1.0` instead of resolving the sibling checkout through `[tool.uv.sources]`. Verified against the tag, not the local path: `uv` fetched and built `v0.1.0` (e3cc7e6), `./scripts/burn/driver.py --help` and `./scripts/burn/benchmark.py --help` both work, and `./scripts/burn/test_driver.py` is 19/19.
 
 `prek run --all-files` reformatted four unrelated `src/*.zig` files (pre-existing `zig fmt` drift on master); those were reverted to keep this commit scoped, and the drift is still there to deal with separately.
 
