@@ -1,8 +1,20 @@
 #!/usr/bin/env -S uv run --script
 
 # /// script
-# requires-python = ">=3.12"
-# dependencies = ["python-decouple>=3.8", "pyyaml>=6.0", "jinja2>=3.1"]
+# requires-python = ">=3.13,<3.14"
+# dependencies = [
+#     "python-decouple>=3.8",
+#     "pyyaml>=6.0",
+#     "jinja2>=3.1",
+#     "burnkit",
+# ]
+#
+# # burnkit is not published yet, so it resolves from the sibling checkout in
+# # ~/git. Replace this block with a tag pin -- "burnkit @
+# # git+https://github.com/pythoninthegrass/burnkit@vX.Y.Z" in dependencies --
+# # once it is published.
+# [tool.uv.sources]
+# burnkit = { path = "../../../burnkit", editable = true }
 # ///
 
 # pyright: reportMissingImports=false
@@ -15,10 +27,11 @@ scoring by gates passed (partial credit) rather than one-shot compile
 success. See docs/bakeoff.md's one-shot bakeoff for the measurement this is
 meant to correct.
 
-Reuses scripts/burn/driver.py read-only (GATES, load_secrets,
-preflight_lemonade, git/sh helpers, kill_task_processes) -- never imports its
-main() and never mutates driver.GATES or the feat/zig-port-burn branch. Each
-candidate runs solo (delegation off) against an isolated per-model
+Reuses burnkit directly (proc helpers, preflight_lemonade, the task-file
+readers) plus scripts/burn/driver.py read-only for this repo's own configured
+values (MACHINE_GATES, REPO/BURN, the model list) -- never imports the
+driver's main() and never mutates driver.MACHINE_GATES or the
+feat/zig-port-burn branch. Each candidate runs solo (delegation off) against an isolated per-model
 $HOME/.hermes so multiple models' session stores/state never collide, inside
 a throwaway --detach git worktree cut from a completed port's pre-port base
 SHA, with a fixed guardrail bundle (zig-0.16 skill + pre-commit hooks
@@ -42,13 +55,15 @@ import subprocess
 import sys
 import time
 import urllib.request
+from burnkit import BurnLayout, preflight_lemonade
+from burnkit.proc import EXIT_MARKER, git, kill_all, kill_task_processes, launch_env, sh
+from burnkit.queue import read_frontmatter, task_md
 from dataclasses import asdict, dataclass, field
 from decouple import config
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import driver  # noqa: E402  read-only reuse: GATES, load_secrets, preflight_lemonade, git/sh, kill_task_processes
-
+import driver  # noqa: E402  read-only reuse of this repo's burnkit config: MACHINE_GATES, REPO, BURN, TASKS_DIR
 import jinja2  # noqa: E402
 import yaml  # noqa: E402
 
@@ -72,6 +87,10 @@ DEFAULT_MAX_TURNS = config("MAX_TURNS", default=150, cast=int)
 LLM_CONTEXT_SIZE = config("LLM_CONTEXT_SIZE", default=131072, cast=int)
 DEFAULT_TASK_TIMEOUT_S = config("TASK_TIMEOUT", default=1200, cast=int)
 DEFAULT_OUT_DIR = Path(config("OUT_DIR", default=str(driver.BURN / "ab"))).expanduser()
+# This harness records its launched pids under its own results dir rather than
+# sharing BURN/pids with the driver, so `benchmark.py kill` cannot take down a
+# live overnight run that happens to be going at the same time.
+LAYOUT = BurnLayout(DEFAULT_OUT_DIR)
 DEFAULT_TASK = "TASK-003.01"
 PROVIDER = "lemonade"
 
@@ -114,10 +133,10 @@ class PortTask:
 
 
 def discover_port_tasks(repo: Path = REPO) -> list[PortTask]:
-    log = driver.git("log", "--all", "--format=%H %s", "--grep=^feat(zig): port", cwd=repo)
+    log = git("log", "--all", "--format=%H %s", "--grep=^feat(zig): port", cwd=repo)
     titles = {}
     for f in (repo / driver.TASKS_DIR).glob("*.md"):
-        fm = driver.read_frontmatter(f)
+        fm = read_frontmatter(f)
         titles[(fm.get("title") or "").strip()] = fm["id"]
 
     out = []
@@ -132,10 +151,10 @@ def discover_port_tasks(repo: Path = REPO) -> list[PortTask]:
         task_id = titles.get(f"Port {c_path} to {zig_name}")
         if task_id is None:
             continue  # title format didn't match this commit (e.g. multi-file ports); skip rather than guess
-        base_sha = driver.git("rev-parse", f"{sha}^", cwd=repo).stdout.strip()
-        zig_lines = len(driver.sh("git", "show", f"{sha}:{zig_path}", cwd=repo).stdout.splitlines())
+        base_sha = git("rev-parse", f"{sha}^", cwd=repo).stdout.strip()
+        zig_lines = len(sh("git", "show", f"{sha}:{zig_path}", cwd=repo).stdout.splitlines())
         try:
-            c_lines = len(driver.sh("git", "show", f"{base_sha}:{c_path}", cwd=repo).stdout.splitlines())
+            c_lines = len(sh("git", "show", f"{base_sha}:{c_path}", cwd=repo).stdout.splitlines())
         except subprocess.CalledProcessError:
             c_lines = 0
         out.append(PortTask(task_id, c_path, zig_path, sha, base_sha, c_lines, zig_lines))
@@ -147,10 +166,10 @@ def find_port_task(task_id: str, base_override: str | None) -> PortTask:
     for t in discover_port_tasks():
         if t.task_id == task_id:
             if base_override:
-                t.base_sha = driver.git("rev-parse", base_override, cwd=REPO).stdout.strip()
+                t.base_sha = git("rev-parse", base_override, cwd=REPO).stdout.strip()
             return t
     if base_override:
-        return PortTask(task_id, "", "", "", driver.git("rev-parse", base_override, cwd=REPO).stdout.strip(), 0, 0)
+        return PortTask(task_id, "", "", "", git("rev-parse", base_override, cwd=REPO).stdout.strip(), 0, 0)
     raise SystemExit(f"{task_id} is not a discoverable completed single-file zig port; pass --base to override.")
 
 
@@ -164,7 +183,7 @@ def cut_worktree(root: Path, model: str, task_id: str, base_sha: str) -> Path:
     subprocess.run(["git", "worktree", "remove", "--force", str(wt)], cwd=REPO, check=False, capture_output=True)
     shutil.rmtree(wt, ignore_errors=True)
     wt.parent.mkdir(parents=True, exist_ok=True)
-    driver.git("worktree", "add", "--detach", str(wt), base_sha)
+    git("worktree", "add", "--detach", str(wt), base_sha, cwd=REPO)
     rom = REPO / "zelda3.sfc"
     if rom.is_file():
         shutil.copy2(rom, wt / "zelda3.sfc")
@@ -269,10 +288,10 @@ def normalize_worktree_fmt(wt: Path) -> str:
     fix_never_mutated_vars(wt)
     run_prek_until_clean(wt)
     if not subprocess.run(["git", "status", "--porcelain"], cwd=wt, capture_output=True, text=True).stdout.strip():
-        return driver.git("rev-parse", "HEAD", cwd=wt).stdout.strip()
-    driver.git("add", "-A", cwd=wt)
-    driver.git("commit", "-m", "chore: normalize prek hooks before agentic bench run", cwd=wt)
-    return driver.git("rev-parse", "HEAD", cwd=wt).stdout.strip()
+        return git("rev-parse", "HEAD", cwd=wt).stdout.strip()
+    git("add", "-A", cwd=wt)
+    git("commit", "-m", "chore: normalize prek hooks before agentic bench run", cwd=wt)
+    return git("rev-parse", "HEAD", cwd=wt).stdout.strip()
 
 
 def remove_worktree(wt: Path) -> None:
@@ -321,19 +340,34 @@ def write_run_config(home: Path, model: str, wt: Path, max_turns: int, skills: b
 # ---------------------------------------------------------------------------
 
 AB_HERMES_CMD = (
-    'set -o pipefail; hermes chat -q "$(cat "$BURN_PROMPT")" --model "$BURN_MODEL" --provider "$BURN_PROVIDER" '
+    'set -o pipefail; echo $$ > "$BURN_PIDFILE"; '
+    'hermes chat -q "$(cat "$BURN_PROMPT")" --model "$BURN_MODEL" --provider "$BURN_PROVIDER" '
     '--yolo -Q --max-turns "$BURN_MAX_TURNS" --accept-hooks --source "$BURN_SOURCE" $BURN_SKILLS_FLAG '
-    '2>&1 | tee "$BURN_LOG"; echo "=== HERMES_EXIT:$? ===" >> "$BURN_LOG"'
+    f'2>&1 | tee "$BURN_LOG"; echo "{EXIT_MARKER}$? ===" >> "$BURN_LOG"'
 )
 
 
 def launch_hermes(
-    wt: Path, home: Path, prompt_file: Path, log: Path, model: str, max_turns: int, source_tag: str, skills: bool, base_env: dict
+    wt: Path,
+    home: Path,
+    prompt_file: Path,
+    log: Path,
+    model: str,
+    max_turns: int,
+    source_tag: str,
+    skills: bool,
+    base_env: dict,
+    pid_name: str,
 ) -> subprocess.Popen:
+    LAYOUT.pids.mkdir(parents=True, exist_ok=True)
     task_env = {
         "HOME": str(home),
         "BURN_PROMPT": str(prompt_file),
         "BURN_LOG": str(log),
+        # Recorded so termination can be scoped to this run's process group.
+        # Without it the only option left is a name search, which is how the
+        # driver used to kill unrelated sessions machine-wide.
+        "BURN_PIDFILE": str(LAYOUT.pids / pid_name),
         "BURN_MODEL": model,
         "BURN_PROVIDER": PROVIDER,
         "BURN_MAX_TURNS": str(max_turns),
@@ -346,7 +380,7 @@ def launch_hermes(
 def wait_for_exit(log: Path, timeout_s: int) -> tuple[bool, float]:
     start = time.time()
     while time.time() - start < timeout_s:
-        if log.exists() and driver.EXIT_MARKER in log.read_text(errors="replace")[-2000:]:
+        if log.exists() and EXIT_MARKER in log.read_text(errors="replace")[-2000:]:
             return True, time.time() - start
         time.sleep(5)
     return False, time.time() - start
@@ -385,9 +419,9 @@ def read_session_stats(home: Path, source_tag: str) -> tuple[int | None, int | N
 
 
 # ---------------------------------------------------------------------------
-# Partial-credit gate scoring (driver.GATES imported, driver.run_gates NOT
-# used -- it short-circuits on first failure, which loses the "how far did
-# it get" signal this harness exists to measure)
+# Partial-credit gate scoring (driver.MACHINE_GATES imported, burnkit's
+# run_machine_gates NOT used -- it short-circuits on first failure, which loses
+# the "how far did it get" signal this harness exists to measure)
 # ---------------------------------------------------------------------------
 
 
@@ -401,16 +435,16 @@ class GateResult:
 
 def score_gates(wt: Path, env: dict) -> list[GateResult]:
     results = []
-    for gate, timeout_s in driver.GATES:
+    for gate in driver.MACHINE_GATES:
         start = time.time()
         try:
-            r = subprocess.run(["task", gate], cwd=wt, env=env, capture_output=True, text=True, timeout=timeout_s)
+            r = subprocess.run(list(gate.argv), cwd=wt, env=env, capture_output=True, text=True, timeout=gate.timeout_s)
             passed = r.returncode == 0
             tail = "" if passed else (r.stdout[-800:] + r.stderr[-800:]).strip()[-300:]
         except subprocess.TimeoutExpired:
             passed = False
-            tail = f"timed out after {timeout_s}s"
-        results.append(GateResult(gate, passed, time.time() - start, tail))
+            tail = f"timed out after {gate.timeout_s}s"
+        results.append(GateResult(gate.name, passed, time.time() - start, tail))
     return results
 
 
@@ -429,7 +463,7 @@ class RunResult:
     bail_reason: str | None
     gates: list[dict] = field(default_factory=list)
     gates_passed: int = 0
-    gates_total: int = len(driver.GATES)
+    gates_total: int = len(driver.MACHINE_GATES)
     turns_used: int | None = None
     turns_source: str = "unknown"
     tool_calls: int | None = None
@@ -491,7 +525,7 @@ def run_one(
             )
             return None
 
-        md = driver.task_md(wt, task.task_id)
+        md = task_md(wt, driver.TASKS_DIR, task.task_id)
         header = (REPO / "scripts/burn/prompt_header.txt").read_text()
         prompts_dir = out_dir / "prompts"
         prompts_dir.mkdir(parents=True, exist_ok=True)
@@ -503,17 +537,18 @@ def run_one(
         log = logs_dir / f"{slugify(model)}.{task.task_id}.log"
         log.unlink(missing_ok=True)
         source_tag = f"ab-bench:{slugify(model)}:{task.task_id}"
+        pid_name = f"ab-{slugify(model)}-{task.task_id}"
 
         start = time.time()
-        launch_hermes(wt, home, prompt_file, log, model, max_turns, source_tag, skills, env)
+        launch_hermes(wt, home, prompt_file, log, model, max_turns, source_tag, skills, env, pid_name)
         finished, _elapsed = wait_for_exit(log, task_timeout_s)
         wall_clock_s = time.time() - start
         if not finished:
-            driver.kill_task_processes(f"ab-{slugify(model)}-{task.task_id}")
+            kill_task_processes(LAYOUT, pid_name)
 
         log_text = log.read_text(errors="replace") if log.exists() else ""
         done, bail_reason = detect_marker(log_text, task.task_id)
-        commits = int(driver.git("rev-list", "--count", f"{norm_sha}..HEAD", cwd=wt).stdout.strip())
+        commits = int(git("rev-list", "--count", f"{norm_sha}..HEAD", cwd=wt).stdout.strip())
         gates = score_gates(wt, env)
         turns_used, tool_calls, turns_source, session_id = read_session_stats(home, source_tag)
 
@@ -544,7 +579,7 @@ def run_one(
         )
         return result
     finally:
-        driver.kill_task_processes(f"ab-{slugify(model)}-{task.task_id}")
+        kill_task_processes(LAYOUT, f"ab-{slugify(model)}-{task.task_id}")  # same name launch_hermes recorded
         if not keep_worktrees:
             remove_worktree(wt)
 
@@ -564,9 +599,9 @@ def cmd_run(args: argparse.Namespace) -> int:
     task = find_port_task(args.task, args.base)
     guardrails = not args.no_guardrails
     skills = guardrails and not args.no_skills
-    env = driver.load_secrets()
+    env = launch_env(driver.SECRETS_ENV, driver.CONFIG.launch_secrets)
 
-    if not driver.preflight_lemonade():
+    if not preflight_lemonade(driver.LEMONADE_URL):
         print("lemonade preflight failed", file=sys.stderr)
         return 3
     missing = [m for m in models if m not in lemonade_models()]
@@ -626,7 +661,7 @@ def render_report_body(results: list[dict], task: PortTask) -> str:
         f"Ground truth is the merged commit `{task.commit_sha[:8]}` (parity-verified 7/7), replayed from its "
         f"pre-port base `{task.base_sha[:8]}`, so 7/7 is known-achievable.",
         "",
-        "How to read: `gates` = X/7 of `driver.GATES` (prek, zig:build, zig:test, zig:difftest, zig:parity, "
+        "How to read: `gates` = X/7 of `driver.MACHINE_GATES` (prek, zig:build, zig:test, zig:difftest, zig:parity, "
         "zig:parity-replay, build), run non-short-circuiting so a partial score reflects how far the attempt got. "
         "How to run: `./scripts/burn/benchmark.py run` (bare invocation replays TASK-003.01 across all 3 default "
         "candidates). `results.json` in the output dir is the machine-readable artifact.",
@@ -647,11 +682,11 @@ def render_report_body(results: list[dict], task: PortTask) -> str:
     lines.append("")
     lines.append("Per-gate detail:")
     lines.append("")
-    lines.append("| Model | Task | " + " | ".join(g for g, _ in driver.GATES) + " |")
-    lines.append("|---|---|" + "---|" * len(driver.GATES))
+    lines.append("| Model | Task | " + " | ".join(g.name for g in driver.MACHINE_GATES) + " |")
+    lines.append("|---|---|" + "---|" * len(driver.MACHINE_GATES))
     for r in results:
         by_name = {g["name"]: g["passed"] for g in r["gates"]}
-        cells = ["y" if by_name.get(g) else "n" for g, _ in driver.GATES]
+        cells = ["y" if by_name.get(g.name) else "n" for g in driver.MACHINE_GATES]
         lines.append(f"| {r['model']} | {r['task']} | " + " | ".join(cells) + " |")
     return "\n".join(lines) + "\n"
 
@@ -687,7 +722,7 @@ def cmd_report(args: argparse.Namespace) -> int:
 
 
 def cmd_status(_args: argparse.Namespace) -> int:
-    print("lemonade:", "up" if driver.preflight_lemonade() else "DOWN")
+    print("lemonade:", "up" if preflight_lemonade(driver.LEMONADE_URL) else "DOWN")
     wts = subprocess.run(["git", "worktree", "list"], cwd=REPO, capture_output=True, text=True).stdout
     ab_wts = [line for line in wts.splitlines() if "/ab/wt/" in line]
     print(f"active A/B worktrees: {len(ab_wts)}")
@@ -697,11 +732,16 @@ def cmd_status(_args: argparse.Namespace) -> int:
 
 
 def cmd_kill(_args: argparse.Namespace) -> int:
-    for name in ("hermes chat",):
-        subprocess.run(["pkill", "-9", "-f", name], check=False)
-    for name in ("zelda3", "sway", "wtype"):
-        subprocess.run(["pkill", "-9", "-x", name], check=False)
-    print("killed hermes/zelda3/sway/wtype")
+    """Kill every run this harness launched, and nothing else.
+
+    Scoped to the process groups of the pids launch_hermes recorded. This used
+    to be `pkill -9 -f "hermes chat"` plus `pkill -9 -x` over zelda3/sway/wtype
+    -- machine-wide, which killed an unrelated session. The headless
+    sway/zelda3/wtype the parity gates spawn are in the run's process group, so
+    the group kill still reaches them.
+    """
+    kill_all(LAYOUT)
+    print(f"killed every run recorded under {LAYOUT.pids}")
     return 0
 
 
@@ -735,7 +775,7 @@ def main() -> int:
     reportp.add_argument("results_json")
 
     sub.add_parser("status", help="lemonade health + active A/B worktrees")
-    sub.add_parser("kill", help="SIGKILL hermes/zelda3/sway/wtype")
+    sub.add_parser("kill", help="SIGKILL every A/B run this harness launched")
 
     args = p.parse_args()
     match args.cmd:
