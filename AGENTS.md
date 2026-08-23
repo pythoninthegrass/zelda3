@@ -203,6 +203,30 @@ in `g_wanted_zelda_features` / `kFeatures0_*`, toggled via `zelda3.ini`. Bug fix
 behavior are gated similarly (`kBugFix_*`) so default behavior can still match the original ROM exactly
 when needed for RAM comparison.
 
+### Overnight burn driver
+
+`scripts/burn/driver.py` drives unattended overnight backlog work on `mf`
+(`run`/`resume`/`status`/`kill`, same as always). It is a **config shim**: the
+shared mechanics — the Backlog.md task queue, the per-task git worktree
+lifecycle, the launch backends, the finish-marker protocol, and the
+proof-of-done gates — live in `burnkit` (`~/git/burnkit`, resolved through the
+script's PEP 723 block). What stays here is this repo's configuration of it:
+the models, the seven Zig gates, the local-only `feat/zig-port-burn` branch,
+the pre-port ROM the parity oracle needs, and the prompt prose in
+`scripts/burn/prompt_header.txt`.
+
+Two consequences worth knowing before editing either side:
+
+- **Fix shared behavior in burnkit, not here.** This driver was previously a
+  copy-adapted script, and that is exactly how it kept a machine-wide `pkill`
+  that had already killed an unrelated session. `scripts/burn/test_driver.py`
+  asserts mechanically that nothing under `scripts/burn/` pattern-matches a
+  process name; termination is scoped to the process group of a recorded pid.
+- **The prompt's TASK STATUS / GIT / BAIL / FINISH sections are generated** by
+  burnkit from the same constants its parser matches, so they are not in
+  `prompt_header.txt` and must not be re-added there — the whole point is that
+  the prose and the parser cannot drift.
+
 ### Checking Fireworks usage/cost
 
 `scripts/burn/driver.py` (the overnight backlog-burn driver on `mf`) runs its orchestrator through
