@@ -4,7 +4,7 @@
 # requires-python = ">=3.13,<3.14"
 # dependencies = [
 #     "python-decouple>=3.8",
-#     "burnkit @ git+https://github.com/pythoninthegrass/burnkit@v0.1.0",
+#     "burnkit @ git+https://github.com/pythoninthegrass/burnkit@v0.3.0",
 # ]
 # ///
 
@@ -38,7 +38,7 @@ from burnkit import (
     copy_prepare,
     dsh_backend,
     hermes_backend,
-    preflight_lemonade,
+    preflight_local_model,
     run_from_cli,
 )
 from decouple import config
@@ -58,15 +58,15 @@ SECRETS_ENV = Path(config("BURN_SECRETS_ENV", default=str(Path.home() / "git/lin
 DSH_ENV_FILE = Path(config("BURN_DSH_ENV", default=str(Path.home() / "git/dsh_config/.env")))
 ORCH_MODEL = config("BURN_ORCH_MODEL", default="accounts/fireworks/models/deepseek-v4-flash-0731")
 ORCH_PROVIDER = config("BURN_ORCH_PROVIDER", default="fireworks")
-BUILDER_MODEL = config("BURN_BUILDER_MODEL", default="Qwen3-Coder-Next-GGUF")
-BUILDER_PROVIDER = config("BURN_BUILDER_PROVIDER", default="lemonade")
-FALLBACK_MODEL = config("BURN_FALLBACK_MODEL", default="Qwen3.6-27B-MTP-GGUF")
-FALLBACK_PROVIDER = config("BURN_FALLBACK_PROVIDER", default="lemonade")
-LEMONADE_URL = config("BURN_LEMONADE_URL", default="http://127.0.0.1:13305/api/v1/models")
+BUILDER_MODEL = config("BURN_BUILDER_MODEL", default="qwen3.8-27b-fp8")
+BUILDER_PROVIDER = config("BURN_BUILDER_PROVIDER", default="vllm")
+FALLBACK_MODEL = config("BURN_FALLBACK_MODEL", default="qwen3.8-27b-fp8")
+FALLBACK_PROVIDER = config("BURN_FALLBACK_PROVIDER", default="vllm")
+HEALTH_CHECK_URL = config("BURN_HEALTH_URL", default="http://127.0.0.1:61519/v1/models")
 TASK_TIMEOUT_S = config("BURN_TASK_TIMEOUT_S", default=4500, cast=int)
 MAX_ATTEMPTS = config("BURN_MAX_ATTEMPTS", default=2, cast=int)
 MAX_TURNS = config("BURN_MAX_TURNS", default=150, cast=int)
-BURN_BACKEND = config("BURN_BACKEND", default="hermes")
+BURN_BACKEND = config("BURN_BACKEND", default="dsh")
 
 # TASK-004.09 (sprite_main.c, 25.8kLOC) needs human subdivision into smaller
 # subtasks before a burn worker can tackle it. The dependency chain is strictly
@@ -111,9 +111,9 @@ prepare_rom = copy_prepare(REPO, ROM_RELS)
 
 
 def health_check(backend: str) -> bool:
-    """lemonade serves hermes' delegated builders; dsh's model is fully local
-    and doesn't touch it, so only hermes needs this preflight."""
-    return backend != "hermes" or preflight_lemonade(LEMONADE_URL)
+    """vLLM/llama-swap serves hermes' delegated builders; dsh's model is fully
+    local and doesn't touch it, so only hermes needs this preflight."""
+    return backend != "hermes" or preflight_local_model(HEALTH_CHECK_URL)
 
 
 CONFIG = BurnConfig(
@@ -133,11 +133,11 @@ CONFIG = BurnConfig(
     builder_provider=BUILDER_PROVIDER,
     fallback_model=FALLBACK_MODEL,
     fallback_provider=FALLBACK_PROVIDER,
-    lemonade_health_url=LEMONADE_URL,
+    health_check_url=HEALTH_CHECK_URL,
     secrets_env=SECRETS_ENV,
     dsh_env_file=DSH_ENV_FILE,
     default_backend=BURN_BACKEND,
-    launch_secrets={"FIREWORKS_API_KEY": "", "LEMONADE_API_KEY": "lemonade"},
+    launch_secrets={"FIREWORKS_API_KEY": "", "LOCAL_API_KEY": "lemonade"},
     health_check=health_check,
     task_timeout_s=TASK_TIMEOUT_S,
     max_attempts=MAX_ATTEMPTS,

@@ -4,7 +4,7 @@
 # requires-python = ">=3.13,<3.14"
 # dependencies = [
 #     "python-decouple>=3.8",
-#     "burnkit @ git+https://github.com/pythoninthegrass/burnkit@v0.1.0",
+#     "burnkit @ git+https://github.com/pythoninthegrass/burnkit@v0.3.0",
 # ]
 # ///
 
@@ -21,8 +21,8 @@ One test here is not about configuration at all: KillScopeTests. The unscoped
 burnkit in the first place, so it is asserted mechanically rather than left to
 a review habit.
 
-Hermetic: no git, no hermes, no lemonade, no Fireworks. The full overnight run
-is exercised live on the mf box."""
+Hermetic: no git, no hermes, no local model server, no Fireworks. The full
+overnight run is exercised live on the mf box."""
 
 import ast
 import burnkit.proc
@@ -64,8 +64,8 @@ class ModelConfigTests(unittest.TestCase):
     def test_fallback_planner_is_the_local_model(self):
         # Repeated fast failures mean the remote provider is sick, so the
         # demotion target has to be something that cannot share its outage.
-        self.assertEqual(driver.CONFIG.fallback_model, "Qwen3.6-27B-MTP-GGUF")
-        self.assertEqual(driver.CONFIG.fallback_provider, "lemonade")
+        self.assertEqual(driver.CONFIG.fallback_model, "qwen3.8-27b-fp8")
+        self.assertEqual(driver.CONFIG.fallback_provider, "vllm")
 
     def test_config_carries_the_model_selection_into_burnkit(self):
         self.assertEqual(driver.CONFIG.model, driver.ORCH_MODEL)
