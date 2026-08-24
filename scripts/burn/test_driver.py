@@ -4,7 +4,7 @@
 # requires-python = ">=3.13,<3.14"
 # dependencies = [
 #     "python-decouple>=3.8",
-#     "burnkit @ git+https://github.com/pythoninthegrass/burnkit@v0.3.0",
+#     "burnkit @ git+https://github.com/pythoninthegrass/burnkit",
 # ]
 # ///
 

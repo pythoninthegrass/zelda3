@@ -6,7 +6,7 @@
 #     "python-decouple>=3.8",
 #     "pyyaml>=6.0",
 #     "jinja2>=3.1",
-#     "burnkit @ git+https://github.com/pythoninthegrass/burnkit@v0.1.0",
+#     "burnkit @ git+https://github.com/pythoninthegrass/burnkit",
 # ]
 # ///
 
