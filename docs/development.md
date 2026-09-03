@@ -103,3 +103,73 @@ instrumentation in tracked files mid-investigation:
 - Always end with a status summary, even on failure/timeout: what was tried, what was
   found, what's still broken. Never end on an empty message.
 - Prefer `git status`/`git diff` review before ending, to catch stray edits.
+
+## Considered and rejected: binary-format DSLs (Kaitai Struct)
+
+Evaluated 2026-09-03. The repo does enough binary work — ROM extraction in `assets/*.py`,
+the `zelda3_assets.dat` container, SPC music, BRR audio, BPS patches, SNES cart headers —
+that a declarative format DSL looks like it should collapse a lot of it. It doesn't. Four
+blockers, any one of which is disqualifying:
+
+- **No target language.** Kaitai compiles to C++/STL, C#, Go, Java, JavaScript, Lua, Nim,
+  Perl, PHP, Python, Ruby, and Rust — no plain C, no Zig. This repo has zero C++ files
+  (`taskfile.yml` sets `CC` and never `CXX`; `zelda3.vcxproj` is `stdc11`), and everything
+  must build under both `cc` and `zig build`, so a generated parser could not serve the
+  classic C path at all.
+- **Kaitai is read-only; this pipeline round-trips.** Nearly every format has a hand-written
+  encoder paired to its decoder, and byte-exact round-trip *is* the correctness test:
+  `assets/text_compression.py:518` re-compresses every decoded string and compares bytes,
+  and `assets/compile_music.py:452` raises if the re-serialized bank differs. Generating the
+  readers would delete the code those verifiers check the writers against. Same shape in C:
+  `InternalSaveLoad` (`src/zelda_rtl.c:364`) is one symmetric read/write visitor.
+- **The offsets are not file offsets.** Every address in the asset pipeline is a 24-bit SNES
+  LoROM virtual address; `LoadedRom.get_byte` (`assets/util.py:89`) remaps it and `get_bytes`
+  (`:100`) steps the pointer over the bank hole mid-read. Kaitai has no address-space
+  remapping concept. Neither does it handle the `SWITCH_BANK` opcode in the dialogue stream,
+  which relocates the read pointer mid-parse (`assets/text_compression.py:423`).
+- **Struct-of-arrays is the dominant idiom, and a schema makes it worse.** One logical
+  record's fields live in a dozen-plus unrelated ROM tables: `get_exit_datas`
+  (`assets/extract_resources.py:42`) reads 13 tables to assemble 79 records, and several
+  fields are reconstructed rather than stored (`base_x = (screen_index & 7) << 9`, `:59`).
+  In `.ksy` that is one `instances:` entry with an explicit `pos:` per field — more verbose
+  than the Python for no gain.
+
+Two further things Kaitai cannot express: the custom five-opcode SNES LZ
+(`assets/util.py:176`, whose copy-offset endianness varies per call site via `offset_is_be`)
+and `ApplyBps` (`src/util.c:223`). A `process:` hook can call out to a custom decompressor,
+but it cannot report *bytes consumed* — which is exactly what five call sites need, e.g.
+`assets/compile_resources.py:123` runs the full decompressor solely to learn the compressed
+length, discards the output, then copies the raw bytes.
+
+The prize is also small. Genuinely structured binary parsing in C is roughly 400 lines out
+of ~87k, across seven sites, of which two are stateful codecs, two need writers, one needs a
+scoring heuristic, one is `fseek`-driven, and one is text INI. The best fit in the repo is
+the cart header (`snes/snes_other.c:107`) — already ported to `snes/snes_other.zig`, where
+the declarative part is ~25 lines and the load-bearing part is a probe-four-offsets-and-score
+heuristic no DSL expresses. The `zelda3_assets.dat` reader is 18 lines of zero-copy pointer
+math (`src/main.c:828`); a generated parser that copies would be a regression.
+
+### ImHex is a different category, not a better Kaitai
+
+ImHex's Pattern Language fits these formats better on paper — it is imperative rather than
+declarative, has `T var @ addr` placement for random access, `#pragma base_address` for the
+LoROM offset, and `std::mem::Section` so a custom decompressor written in the language itself
+can emit into a section that further patterns are placed over. But ImHex is an interactive
+reverse-engineering workbench, not a code generator: the output is in-editor highlighting and
+a parsed tree, not source that gets compiled. So it does not compete with Kaitai for a job
+this repo has; it fills a gap the repo does have, namely that there is no way to eyeball a ROM
+table without reading `assets/extract_resources.py`. Worth installing as a personal tool;
+not worth a repo dependency. Ceiling for anything committed would be one or two `.hexpat`
+files under `other/`, explicitly non-authoritative, with no build wiring — extraction stays
+the source of truth.
+
+### If a declarative win is wanted later
+
+The leverage is in-language, not a DSL. The repeated pattern is "field at
+`base_addr + index * stride`, type `u8`/`u16`", instantiated ~30 times across
+`get_exit_datas` (`assets/extract_resources.py:42`), `get_ow_travel_infos`, `print_room`'s
+header (`:389`), and `OutArrays`/`print_overworld_tables` (`assets/compile_resources.py:221`).
+A small `(name, base_addr, stride, type)` descriptor generating *both* reader and writer would
+collapse those while preserving the bidirectionality Kaitai breaks, with no new dependency.
+Not recommended now: it is speculative refactoring of working code whose only test is
+byte-exact round-trip, in a pipeline that runs once at build time and is not a bottleneck.
