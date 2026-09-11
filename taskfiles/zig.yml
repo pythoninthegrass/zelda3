@@ -18,13 +18,13 @@ tasks:
     generates:
       - "{{.ZIG_BIN}}"
     cmds:
-      - zig build
+      - "{{.ZIG}} build"
 
   run:
     desc: Build and run the Zig-built zelda3 binary
     deps: [build]
     cmds:
-      - zig build run
+      - "{{.ZIG}} build run"
 
   clean:
     desc: Remove Zig build artifacts (zig-out/, .zig-cache/)
@@ -65,7 +65,7 @@ tasks:
       - src/**/*.zig
       - snes/**/*.zig
     cmds:
-      - zig build test
+      - "{{.ZIG}} build test"
 
   difftest:
     desc: Run Tier-B differential tests (C-vs-Zig behavioral equivalence) for ported Zig modules; no-op until a module exists
@@ -75,10 +75,12 @@ tasks:
       - src/**/*.zig
       - snes/**/*.zig
     cmds:
-      - zig build difftest
+      - "{{.ZIG}} build difftest"
 
   ast-check:
     desc: Run `zig ast-check` over every ported .zig file (fast, source-only; no type-checking or build)
+    env:
+      ZIG_BIN: "{{.ZIG}}"
     cmds:
       - find src snes -name '*.zig' -print0 | xargs -0 {{.ROOT_DIR}}/scripts/zig-ast-check.sh
 

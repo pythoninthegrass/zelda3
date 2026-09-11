@@ -33,9 +33,14 @@ CLAUDE.md
 /zelda3.wiki
 /zig-out/
 /.zig-cache/
+/.zig-cache-global/
 /sprites-gfx
 /glsl-shaders
 /token.txt
+
+# Entire session-capture tooling (local, not shared)
+/.pi/
+/.entire/
 
 # General
 .DS_Store

@@ -24,13 +24,14 @@ Three local facts explain the bakeoff result without needing to indict the model
    category, and beats the "medium" category on general intelligence.
 2. **The `zig-0.16` skill never reaches the burn worker.** `hermes chat` (what `scripts/burn/driver.py`
    invokes) doesn't load Claude Code skills — the worker's entire prompt is
-   `scripts/burn/prompt_header.txt` concatenated with the task markdown (`driver.py:404`). The 25 KB
+   `scripts/burn/prompt_header.txt` plus burnkit's shared protocol sections, concatenated with the task
+   markdown (composed by `burnkit.prompt`; before the burnkit extraction this was `driver.py:404`). The 25 KB
    pinned-0.16 skill sitting in `.claude/skills/zig-0.16/SKILL.md` currently does nothing for an
    autonomous burn run.
 3. **The bakeoff was the worst possible way to measure this**: one-shot, no compiler feedback, no
    iteration. The burn driver's real pipeline gives hermes up to 150 turns *with* tools and a battery of
    deterministic gates (`prek`, `zig:build`, `zig:test`, `zig:difftest`, `zig:parity`,
-   `zig:parity-replay`, `build` — `driver.py:302-310`). Every recurring bakeoff error class — a `var`
+   `zig:parity-replay`, `build` — `driver.py`'s `MACHINE_GATES`). Every recurring bakeoff error class — a `var`
    never mutated, `@intCast`/`@truncate` signedness, `@memset` on a fixed array instead of a slice, `u3`
    bitfield overflow — is caught with a precise, actionable message the moment `zig build` runs. One-shot
    chat completion never gets to see that message, let alone act on it.

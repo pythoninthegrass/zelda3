@@ -1657,6 +1657,20 @@ pub export fn SpcPlayer_Initialize(p: *SpcPlayer) callconv(.c) void {
     Spc_Loop_Part1(p);
 }
 
+// Opaque accessors for the src/zelda_rtl.zig port: InternalSaveLoad saves
+// p->ram (0x10000 of apu ram) and dsp_saveload(p->dsp, ...) — the importer
+// cannot `@import` this module (symbol duplication, see ppu.zig's
+// PpuCopyCgramFromBuffer note), so it reaches these fields through here.
+pub export fn SpcPlayer_GetRam(p: *anyopaque) [*]u8 {
+    const s: *SpcPlayer = @ptrCast(@alignCast(p));
+    return @ptrCast(&s.ram[0]);
+}
+
+pub export fn SpcPlayer_GetDsp(p: *anyopaque) ?*anyopaque {
+    const s: *SpcPlayer = @ptrCast(@alignCast(p));
+    return s.dsp;
+}
+
 pub export fn SpcPlayer_CopyVariablesToRam(p: *SpcPlayer) callconv(.c) void {
     const pbytes: [*]u8 = @ptrCast(p);
     for (0..8) |i| {

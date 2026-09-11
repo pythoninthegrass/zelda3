@@ -114,7 +114,7 @@ Lance (`67d4435`) to require a `prek` pass alongside the existing
 
 Re-benches the same candidate models on **TASK-003.01** (`snes/input.c` -> `snes/input.zig`), but this time with the real burn regime: tool access, compiler feedback, and up to N turns per `scripts/burn/driver.py`'s gate sequence -- scored by gates passed, not one-shot compile success. Ground truth is the merged commit `27870780` (parity-verified 7/7), replayed from its pre-port base `8605e2c0`, so 7/7 is known-achievable.
 
-How to read: `gates` = X/7 of `driver.GATES` (prek, zig:build, zig:test, zig:difftest, zig:parity, zig:parity-replay, build), run non-short-circuiting so a partial score reflects how far the attempt got. How to run: `./scripts/burn/benchmark.py run` (bare invocation replays TASK-003.01 across all 3 default candidates). `results.json` in the output dir is the machine-readable artifact.
+How to read: `gates` = X/7 of `driver.MACHINE_GATES` (prek, zig:build, zig:test, zig:difftest, zig:parity, zig:parity-replay, build), run non-short-circuiting so a partial score reflects how far the attempt got. How to run: `./scripts/burn/benchmark.py run` (bare invocation replays TASK-003.01 across all 3 default candidates). `results.json` in the output dir is the machine-readable artifact.
 
 | Model | Task | Gates | Turns | Tool calls | Wall-clock | Status |
 |---|---|---|---|---|---|---|

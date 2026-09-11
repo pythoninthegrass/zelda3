@@ -159,6 +159,39 @@ pub export fn ppu_free(ppu: ?*Ppu) void {
     free(ppu);
 }
 
+// g_zenv.ppu is typed `?*anyopaque` in variables.zig (ZeldaEnv) so that
+// callers outside this compilation unit (e.g. src/nmi.zig) don't need to
+// `@import` this file's module graph just to reach `cgram`/`oam` — doing so
+// would pull every `pub export fn` in this file into the importer's own
+// object, duplicating symbols already linked in via the "ppu" object.
+pub export fn PpuCopyCgramFromBuffer(ppu: *anyopaque, src: [*]const u8) void {
+    const p: *Ppu = @ptrCast(@alignCast(ppu));
+    @memcpy(std.mem.asBytes(&p.cgram), src[0..@sizeOf(@TypeOf(p.cgram))]);
+}
+
+pub export fn PpuCopyOamFromBuffer(ppu: *anyopaque, src: [*]const u8) void {
+    const p: *Ppu = @ptrCast(@alignCast(ppu));
+    @memcpy(std.mem.asBytes(&p.oam), src[0..@sizeOf(@TypeOf(p.oam))]);
+}
+
+// More opaque accessors for the src/zelda_rtl.zig port (ZeldaDrawPpuFrame /
+// ZeldaInitialize reach a few Ppu fields): mode, the vram array base, and
+// extraLeftRight.
+pub export fn PpuGetCurrentMode(ppu: *anyopaque) u8 {
+    const p: *Ppu = @ptrCast(@alignCast(ppu));
+    return p.mode;
+}
+
+pub export fn PpuGetVram(ppu: *anyopaque) [*]u16 {
+    const p: *Ppu = @ptrCast(@alignCast(ppu));
+    return @ptrCast(&p.vram[0]);
+}
+
+pub export fn PpuGetExtraSideSpace(ppu: *anyopaque) u8 {
+    const p: *Ppu = @ptrCast(@alignCast(ppu));
+    return p.extraLeftRight;
+}
+
 pub export fn ppu_reset(ppu: *Ppu) void {
     @memset(&ppu.vram, 0);
     ppu.lastBrightnessMult = 0xff;

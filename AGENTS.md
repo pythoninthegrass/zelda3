@@ -169,12 +169,64 @@ reimplementation's `g_ram`. Passing a ROM on the command line enables comparing 
 This is the project's primary correctness signal for game-logic ports — new/changed C logic should keep
 producing identical RAM state to the original when this mode is enabled.
 
+### Zig porting gotchas
+
+Porting a `.c` file to `.zig`? Read `docs/porting-playbook.md` first — procedure, verify
+gauntlet, cross-module/struct-twin/globals rules, commit convention.
+
+`@as(T, x) OP y` and `@as(T, x) OP (if ...)` can mis-parse — parenthesize the non-`@as` side
+rather than substituting different logic to dodge the error. Zig 0.16 dropped standalone
+`|%`/`^%` (compound forms still work); no `do-while` (`while (true) {...; if (!cond) break;}`).
+`@intCast` keeps its range check in `ReleaseFast` and will `SIGTRAP` where C would silently
+truncate — use `@truncate` to match C. `zig` on `PATH` may resolve to a stale mise
+`mach-latest` build instead of the pinned 0.16.0 if the shell isn't mise-activated — prefer
+the `task zig:*` wrappers (they pin it via `{{.ZIG}}`), or check `mise which zig` before
+trusting a raw build error. Headless agent runs must not end mid-task with unremoved debug
+instrumentation or no summary. Full list and real incidents: `docs/development.md`.
+
+### Headless/sandbox agent runs
+
+- `task`/`task zig:*` already pin the correct zig and a writable
+  `ZIG_GLOBAL_CACHE_DIR` — no need to `export`/`mise exec --` anything yourself.
+- The Backlog.md MCP server can be misindexed for this repo under some harnesses; if
+  `task_view`/`task_edit` report "not found" for a task you know exists, edit
+  `backlog/tasks/*.md` on disk directly instead of retrying the MCP call.
+- The `Edit`/`edit` tool requires a prior `Read`/`read` tool call on that file — a bash
+  `sed`/`grep`/`cat` does not satisfy this.
+- Keep context lean: offload bulk file reads or a multi-step port to a subagent rather than
+  reading everything inline, and don't re-read your own session log to "recall" progress.
+
 ### Feature flags
 
 `src/features.h` defines non-authentic enhancements (widescreen, bug fixes, control tweaks, etc.) as bits
 in `g_wanted_zelda_features` / `kFeatures0_*`, toggled via `zelda3.ini`. Bug fixes that alter original
 behavior are gated similarly (`kBugFix_*`) so default behavior can still match the original ROM exactly
 when needed for RAM comparison.
+
+### Overnight burn driver
+
+`scripts/burn/driver.py` drives unattended overnight backlog work on `mf`
+(`run`/`resume`/`status`/`kill`, same as always). It is a **config shim**: the
+shared mechanics — the Backlog.md task queue, the per-task git worktree
+lifecycle, the launch backends, the finish-marker protocol, and the
+proof-of-done gates — live in
+[`burnkit`](https://github.com/pythoninthegrass/burnkit), pinned to a tag in the
+script's PEP 723 block. What stays here is this repo's configuration of it:
+the models, the seven Zig gates, the local-only `feat/zig-port-burn` branch,
+the pre-port ROM the parity oracle needs, and the prompt prose in
+`scripts/burn/prompt_header.txt`.
+
+Two consequences worth knowing before editing either side:
+
+- **Fix shared behavior in burnkit, not here.** This driver was previously a
+  copy-adapted script, and that is exactly how it kept a machine-wide `pkill`
+  that had already killed an unrelated session. `scripts/burn/test_driver.py`
+  asserts mechanically that nothing under `scripts/burn/` pattern-matches a
+  process name; termination is scoped to the process group of a recorded pid.
+- **The prompt's TASK STATUS / GIT / BAIL / FINISH sections are generated** by
+  burnkit from the same constants its parser matches, so they are not in
+  `prompt_header.txt` and must not be re-added there — the whole point is that
+  the prose and the parser cannot drift.
 
 ### Checking Fireworks usage/cost
 

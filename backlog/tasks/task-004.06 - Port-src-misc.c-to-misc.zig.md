@@ -1,9 +1,10 @@
 ---
 id: TASK-004.06
 title: Port src/misc.c to misc.zig
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-02 04:20'
+updated_date: '2026-08-18 11:59'
 labels: []
 dependencies:
   - TASK-004.05
@@ -19,16 +20,16 @@ Port src/misc.c, containing Module_MainRouting — the top-level game-state disp
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 misc.c is removed from the C build and misc.zig is compiled instead
-- [ ] #2 Module_MainRouting dispatches every game module/state identically to before
-- [ ] #3 Full parity verification passes (build clean, zero RAM-compare mismatches, reference-save replay clean across all major game states: overworld, dungeon, menus)
+- [x] #1 misc.c is removed from the C build and misc.zig is compiled instead
+- [x] #2 Module_MainRouting dispatches every game module/state identically to before
+- [x] #3 Full parity verification passes (build clean, zero RAM-compare mismatches, reference-save replay clean across all major game states: overworld, dungeon, menus)
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 task zig:build compiles clean
-- [ ] #2 Running the binary with zelda3.sfc loaded shows zero 'Memory compare failed' lines on stderr (RAM-compare oracle)
-- [ ] #3 Replay of reference saves (saves/ref/Chapter*.sav) stays clean
-- [ ] #4 The file's C-ABI symbols are unchanged so remaining .c files link without edits
-- [ ] #5 zelda3.bak and the C taskfile.yml build remain untouched and working
+- [x] #1 task zig:build compiles clean
+- [x] #2 Running the binary with zelda3.sfc loaded shows zero 'Memory compare failed' lines on stderr (RAM-compare oracle)
+- [x] #3 Replay of reference saves (saves/ref/Chapter*.sav) stays clean
+- [x] #4 The file's C-ABI symbols are unchanged so remaining .c files link without edits
+- [x] #5 zelda3.bak and the C taskfile.yml build remain untouched and working
 <!-- DOD:END -->

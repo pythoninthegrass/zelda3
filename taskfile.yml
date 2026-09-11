@@ -13,8 +13,14 @@ includes:
 env:
   VENV_DIR: "{{.ROOT_DIR}}/.venv"
   PATH: "{{.VENV_DIR}}/bin:{{.PATH}}"
+  ZIG_GLOBAL_CACHE_DIR: '{{.ROOT_DIR}}/.zig-cache-global' # writable; ~/.cache/zig may be read-only in a sandbox
 
 vars:
+  # {{.ZIG}}: pinned zig (repo .tool-versions) without a `mise exec --` prefix; use this, not bare `zig`,
+  # in cmds: -- env.PATH can't override PATH since Task lets pre-existing OS env vars win (confirmed empirically).
+  ZIG_BIN_DIR:
+    sh: dirname "$(mise which zig 2>/dev/null || command -v zig)"
+  ZIG: '{{.ZIG_BIN_DIR}}/zig'
   TARGET_EXEC: zelda3
   SDL2_VERSION: "2.32.10"
   CC: '{{.CC | default "cc"}}'
@@ -82,7 +88,7 @@ tasks:
     generates: ['src/config.o']
     cmds:
       - >-
-        zig build-obj -O ReleaseFast -lc
+        {{.ZIG}} build-obj -O ReleaseFast -lc
         -femit-bin=src/config.o src/config.zig
 
   compile-zig-poly:
@@ -93,7 +99,7 @@ tasks:
     generates: ['src/poly.o']
     cmds:
       - >-
-        zig build-obj -O ReleaseFast -lc
+        {{.ZIG}} build-obj -O ReleaseFast -lc
         -femit-bin=src/poly.o src/poly.zig
 
   compile-zig-tile_detect:
@@ -104,7 +110,7 @@ tasks:
     generates: ['src/tile_detect.o']
     cmds:
       - >-
-        zig build-obj -O ReleaseFast -lc
+        {{.ZIG}} build-obj -O ReleaseFast -lc
         -femit-bin=src/tile_detect.o src/tile_detect.zig
 
   compile-zig-input:
@@ -115,7 +121,7 @@ tasks:
     generates: ['snes/input.o']
     cmds:
       - >-
-        zig build-obj -O ReleaseFast -lc
+        {{.ZIG}} build-obj -O ReleaseFast -lc
         -femit-bin=snes/input.o snes/input.zig
 
   compile-zig-cart:
@@ -126,7 +132,7 @@ tasks:
     generates: ['snes/cart.o']
     cmds:
       - >-
-        zig build-obj -O ReleaseFast -lc
+        {{.ZIG}} build-obj -O ReleaseFast -lc
         -femit-bin=snes/cart.o snes/cart.zig
 
   compile-zig-apu:
@@ -137,7 +143,7 @@ tasks:
     generates: ['snes/apu.o']
     cmds:
       - >-
-        zig build-obj -O ReleaseFast -lc
+        {{.ZIG}} build-obj -O ReleaseFast -lc
         -femit-bin=snes/apu.o snes/apu.zig
 
   compile-zig-util:
@@ -148,7 +154,7 @@ tasks:
     generates: ['src/util.o']
     cmds:
       - >-
-        zig build-obj -O ReleaseFast -lc
+        {{.ZIG}} build-obj -O ReleaseFast -lc
         -femit-bin=src/util.o src/util.zig
 
   compile:
